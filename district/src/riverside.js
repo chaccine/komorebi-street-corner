@@ -14,12 +14,14 @@ function buildRiverside(g){
   // Sandstone layers along the cut bank, with the current drawn in short broken strokes.
   slab(10.28,-1.36,5.15,4.56,.78,10.7,'#948d77');
   slab(10.28,-1.02,5.15,4.56,.23,10.7,'#9dbba1');
+  g.group(0,false,'riverWater');
   slab(10.28,-.894,5.15,4.56,.07,10.7,'#75b7ac');
   for(let i=0;i<100;i++){
     const x=8.08+random()*4.34,z=.04+random()*10.17,l=.13+random()*.55;
     const c=i%4===0?'#b6d8bd':i%4===1?'#97c9b8':'#84bfb1';
     g.face([[x,-.855,z-l*.5],[x-.034,-.855,z],[x+.02,-.855,z+l*.5],[x+.025,-.855,z]],c);
   }
+  g.group(0);
   slab(16.55,-.96,5.15,8.1,1.72,10.7,'#ab9e83');
   slab(16.55,-1.45,5.15,8.105,.15,10.705,'#a3967d');
   slab(16.55,-.27,5.15,8.116,.2,10.716,'#b5ab8c');

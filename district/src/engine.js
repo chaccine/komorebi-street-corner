@@ -143,7 +143,9 @@ function districtUnit(a){const l=Math.hypot(...a)||1;return a.map(v=>v/l);}
 function createDistrictRenderer(canvas,geometry){
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});
   if(!gl)throw Error('WebGL 2 unavailable');
-  const atlasImage=geometry.finish(),batches=[...geometry.groups.values()].filter(b=>b.used);
+  const atlasImage=geometry.finish(),allBatches=[...geometry.groups.values()].filter(b=>b.used);
+  const skyBatches=allBatches.filter(b=>b.id>=44&&b.id<=46);
+  const batches=allBatches.filter(b=>!skyBatches.includes(b));
   const floorY=geometry.minimumY-.036;
   const floorGeometry=createDistrictGeometry();
   floorGeometry.face([[-170,floorY,-170],[-170,floorY,170],[170,floorY,170],[170,floorY,-170]],'#efedde');
@@ -157,6 +159,10 @@ function createDistrictRenderer(canvas,geometry){
   uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water,pageTurn;
   uniform vec3 birdOffset;
   uniform float birdYaw,wingFold;
+  uniform float cloudShift;
+  uniform vec3 swallowPosition;
+  uniform vec4 swallowAngles;
+  uniform float swallowFold;
   uniform vec4 walker;
   uniform float reading;
   out vec3 normal,color,world,sun;out vec2 uv;
@@ -238,6 +244,22 @@ function createDistrictRenderer(canvas,geometry){
       if(movement==19){vec2 pivot=vec2(-1.552,.995);p.xy=pivot+turn*(p.xy-pivot);n.xy=turn*n.xy;}
       else{vec2 pivot=vec2(.745,6.858);p.yz=pivot+turn*(p.yz-pivot);n.yz=turn*n.yz;}
     }
+    if(movement==21)p.xz+=vec2(cloudShift,cloudShift*.29);
+    if(movement==22||movement==23){
+      if(movement==23){
+        float side=sign(p.z),a=side*1.28*swallowFold;
+        vec2 hinge=vec2(.04,.046*side);
+        mat2 tuck=mat2(cos(a),sin(a),-sin(a),cos(a));
+        p.xz=hinge+tuck*(p.xz-hinge);n.xz=tuck*n.xz;
+        a=-side*swallowAngles.w;
+        mat2 flap=mat2(cos(a),sin(a),-sin(a),cos(a));
+        p.yz=vec2(.08,hinge.y)+flap*(p.yz-vec2(.08,hinge.y));n.yz=flap*n.yz;
+      }
+      vec3 c=cos(swallowAngles.xyz),s=sin(swallowAngles.xyz);
+      mat2 bank=mat2(c.z,s.z,-s.z,c.z),pitch=mat2(c.y,s.y,-s.y,c.y),yaw=mat2(c.x,s.x,-s.x,c.x);
+      p.yz=bank*p.yz;n.yz=bank*n.yz;p.xy=pitch*p.xy;n.xy=pitch*n.xy;
+      p.xz=yaw*p.xz;n.xz=yaw*n.xz;p+=swallowPosition;
+    }
     world=p;normal=n;color=paint;uv=st;
     sun=(solar*vec4(p,1.)).xyz*.5+.5;gl_Position=view*vec4(p,1.);
     if(movement==5&&(water<.44||water>1.93))gl_Position=vec4(2.,2.,2.,1.);
@@ -247,7 +269,7 @@ function createDistrictRenderer(canvas,geometry){
   in vec3 normal,color,world,sun;in vec2 uv;
   uniform sampler2D atlas;uniform highp sampler2D shadows;
   uniform vec3 eye,light;uniform float lamp;uniform int id,movement,stage,hover;
-  uniform float birdAge;
+  uniform float birdAge,cloudShift;
   out vec4 outColor;
   float sunlight(vec3 n){
     if(any(lessThan(sun,vec3(0.)))||any(greaterThan(sun,vec3(1.))))return 1.;
@@ -305,6 +327,14 @@ function createDistrictRenderer(canvas,geometry){
       }
       lit=mix(lit,vec3(.85,.91,.77),min(1.,wave)*.84);
     }
+    if(movement==21){
+      float warm=smoothstep(-.18,.82,dot(normalize(normal),light));
+      lit=mix(vec3(.75,.81,.81),vec3(1.,.971,.901),warm*.64+.33*smoothstep(6.00,6.80,world.y));
+    }
+    if(movement==24&&n.y>.6){
+      vec2 shadeUV=(world.xz-vec2(10.65+cloudShift,2.15+.29*cloudShift))/vec2(2.9,1.1);
+      lit*=1.-.072*(1.-smoothstep(.12,1.25,dot(shadeUV,shadeUV)));
+    }
     if(id==hover&&hover>0)lit=mix(lit,vec3(1.,.92,.69),.105);
     outColor=vec4(clamp(lit,0.,1.),float(id)/255.);
   }`;
@@ -358,7 +388,7 @@ function createDistrictRenderer(canvas,geometry){
       return loc;
     }
     const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn birdOffset birdYaw wingFold walker reading atlas';
-    const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover birdAge');
+    const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover birdAge cloudShift swallowPosition swallowAngles swallowFold');
     const shadow=makeProgram(vertex,shadowFragment,motionUniforms);
     const screen=makeProgram(screenVS,screenFS,'image depthMap stroke');
     function texture(){
@@ -413,7 +443,7 @@ function createDistrictRenderer(canvas,geometry){
         buffers.set(g,vao);deletes.push(()=>{gl.deleteVertexArray(vao);gl.deleteBuffer(buf);});
       }
       gl.bindVertexArray(buffers.get(g));
-      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8,sparrow:9,nearWing:10,farWing:11,basinWater:12,walker:13,leftStep:14,rightStep:15,leftSwing:16,rightSwing:17,footShadow:18,pointing:19,lapPaper:20}[g.motion]||0);
+      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8,sparrow:9,nearWing:10,farWing:11,basinWater:12,walker:13,leftStep:14,rightStep:15,leftSwing:16,rightSwing:17,footShadow:18,pointing:19,lapPaper:20,cloud:21,swallow:22,swallowWing:23,riverWater:24}[g.motion]||0);
       if(g.motion==='cloth'){
         gl.uniform1f(loc.clothTop,g.hi[1]);gl.uniform1f(loc.clothHeight,g.hi[1]-g.lo[1]);
       }
@@ -471,6 +501,7 @@ function createDistrictRenderer(canvas,geometry){
       gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.viewport(0,0,w,h);
       gl.clearColor(.948,.941,.898,0);gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT|gl.COLOR_BUFFER_BIT);
       shared(scene,m,state);bind(1,sunDepth);gl.uniform1i(scene.shadows,1);
+      gl.uniform1f(scene.cloudShift,state.cloudShift);
       gl.uniform3fv(scene.eye,state.eye||[.2,.5,.8]);gl.uniform3fv(scene.light,direction);
       gl.uniform1f(scene.lamp,state.lamp||0);gl.uniform1i(scene.hover,state.hover||0);
       if(!state.eye||state.eye[1]>.025){gl.uniform1i(scene.stage,1);drawBatch(floor,scene);}
@@ -480,6 +511,20 @@ function createDistrictRenderer(canvas,geometry){
       gl.blendFuncSeparate(gl.CONSTANT_ALPHA,gl.ONE_MINUS_CONSTANT_ALPHA,gl.ONE,gl.ZERO);
       for(const b of visible)if(b.motion==='glass')drawBatch(b,scene);
       gl.disable(gl.BLEND);
+      if(state.skyVisible){
+        // Keep the picking channel of the street below each visible cloud or bird pixel.
+        gl.colorMask(true,true,true,false);
+        for(const b of skyBatches){
+          const pose=state.swallows[b.id-45];
+          if(pose){
+            gl.uniform3fv(scene.swallowPosition,pose.position);
+            gl.uniform4f(scene.swallowAngles,pose.yaw,pose.pitch,pose.bank,pose.flap);
+            gl.uniform1f(scene.swallowFold,pose.fold);
+          }
+          drawBatch(b,scene);
+        }
+        gl.colorMask(true,true,true,true);
+      }
       gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.disable(gl.DEPTH_TEST);gl.useProgram(screen.pr);
       bind(0,paint);bind(1,depth);gl.uniform1i(screen.image,0);gl.uniform1i(screen.depthMap,1);
       const radius=Math.max(.85,.68*w/Math.max(1,rect.width));

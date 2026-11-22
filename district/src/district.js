@@ -19,7 +19,8 @@ async function startDistrict(){
   // Let the cover reach the screen before outlining the thousands of small faces.
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   const mesh=createDistrictGeometry();
-  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);buildRiverside(mesh);buildAfternoon(mesh);
+  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);buildRiverside(mesh);buildAfternoon(mesh);buildRiverSky(mesh);
+  const sky=createRiverSky();
   const scene=createDistrictRenderer(canvas,mesh);
   const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
   const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -48,7 +49,7 @@ async function startDistrict(){
     const aspect=width/Math.max(1,height),portrait=aspect<.84;
     if(id===7||id===10){
       const river=id===7;
-      const points=river?[[7.6,.72,7.95],[12,-.9,1.9],[16,0,.2],[15.7,0,10],[14.16,1.60,8.36],[19.4,3,2.2]]:
+      const points=river?[[7.6,.72,7.95],[12,-.9,1.9],[16,0,.2],[15.7,0,10],[14.16,1.60,8.36],[19.1,2.8,8.75],[16.2,7.0,.7],[10.25,5.1,2.6]]:
         [[-.8,0,7.5],[.4,2.35,7.85],[2.45,2.15,6.7],[8,.8,7.9],[11.9,.7,7.3]];
       return fit(points,river?-.52:.58,river?.62:.58,aspect,.57);
     }
@@ -92,6 +93,9 @@ async function startDistrict(){
   function stopFlight(){transition=null;}
   function travel(id,instant=false,changeAddress=true){
     const crossing=riverBank(focus)!==riverBank(id);
+    const skyTime=(performance.now()-start)/1000;
+    if(id===7&&crossing)sky.approach(skyTime,reduced.matches);
+    if(id!==7)sky.cancel();
     focus=id;hover=0;
     if(changeAddress)address(id,crossing);
     const to=poseFor(id);
@@ -214,6 +218,7 @@ async function startDistrict(){
       if(p===1)transition=null;
     }
     const time=(now-start)/1000,windAge=(now-clothStart)/1000,windPhase=(time+14)%27;
+    if(focus===7&&!transition)sky.arrive(time);
     const natural=pulse(windPhase,2.8)*.28;
     const cloth=reduced.matches?0:Math.max(natural,pulse(windAge,2.7));
     const rainPhase=(time+32)%57,rain=reduced.matches?0:pulse(rainPhase,11);
@@ -246,17 +251,21 @@ async function startDistrict(){
     const streetVisible=inFrame(-3.94,.83,1.68,2.18,.83,.36);
     const benchClose=height/view.extent>95&&inFrame(-1.78,.86,6.88,.73,.62,.43);
     const walker=afternoonPose(reduced.matches?0:time);
+    const swallows=sky.sample(time,reduced.matches);
+    const skyVisible=inFrame(14.6,4.9,4.8,5.1,2.5,4.4);
+    const cloudShift=reduced.matches?0:Math.sin(time*.096)*.60+Math.sin(time*.041)*.18;
     const reading=benchClose&&!reduced.matches?pulse((time+2.4)%9,2.6):0;
     const angle=reduced.matches&&Number.isFinite(wheelStart)?wheelBase+wheelTravel:currentWheel(now);
-    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,bird,birdAge,walker,reading,
+    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,bird,birdAge,walker,reading,swallows,cloudShift,skyVisible,
       pageTurn:pageOpen?turn:1-turn,water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
       rainTime:time,rainAmount:rain});
     if(!canvas.dataset.ready){canvas.dataset.ready='true';document.querySelector('.poster')?.remove();}
     if(animating){
       if(mobile||economy)timer=setTimeout(request,Math.max(0,1000/30-(performance.now()-now)-7));
       else request();
-    }else if(!reduced.matches&&(streetVisible||benchClose)){
-      timer=setTimeout(request,streetVisible||reading>0?(mobile?65:45):250);
+    }else if(!reduced.matches&&(streetVisible||benchClose||skyVisible)){
+      const flying=skyVisible&&swallows.some(b=>b.air);
+      timer=setTimeout(request,flying?(mobile?44:33):streetVisible||reading>0?(mobile?65:45):220);
     }else if(!reduced.matches){
       // Sleep until the next breeze or passing shower.
       timer=setTimeout(request,Math.max(24,1000*Math.min(27-windPhase,57-rainPhase)+12));
