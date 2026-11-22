@@ -4,8 +4,13 @@ const districtPlaces=[
   {id:3,slug:'flats',name:'外廊公寓',center:[4.90,2.65,-.44],width:3.95,height:5.65,yaw:.29,feature:[5.35,4.45,.28]},
   {id:4,slug:'florist',name:'巷尾花店',center:[-1.4,1.42,-12.18],width:5.75,height:3.65,yaw:-.23,feature:[-.22,1.06,-10.75]},
   {id:5,slug:'newsstand',name:'旧书报亭',center:[1.17,.99,7.20],width:2.85,height:2.44,yaw:-.36,feature:[.92,1.03,7.68]},
-  {id:6,slug:'courtyard',name:'石阶小庭',center:[-.08,.51,-7.45],width:3.5,height:2.55,yaw:-.68,feature:[-.38,.70,-7.16]}
+  {id:6,slug:'courtyard',name:'石阶小庭',center:[-.08,.51,-7.45],width:3.5,height:2.55,yaw:-.68,feature:[-.38,.70,-7.16]},
+  {id:7,slug:'riverside',name:'沿河小街'},
+  {id:8,slug:'postbox',name:'河岸红邮筒',center:[14.1,.83,8.3],width:2.4,height:2.5,yaw:.42},
+  {id:9,slug:'riverside-steps',name:'亲水石阶',center:[12.05,-.15,3.17],width:3.65,height:2.8,yaw:-.96},
+  {id:10,slug:'bridgehead',name:'旧书报亭桥头'}
 ];
+const riverBank=id=>id>=7&&id<=9;
 
 async function startDistrict(){
   const canvas=document.querySelector('canvas'),status=document.querySelector('[role=status]');
@@ -14,7 +19,7 @@ async function startDistrict(){
   // Let the cover reach the screen before outlining the thousands of small faces.
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   const mesh=createDistrictGeometry();
-  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);
+  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);buildRiverside(mesh);
   const scene=createDistrictRenderer(canvas,mesh);
   const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
   const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -41,46 +46,60 @@ async function startDistrict(){
   }
   function poseFor(id){
     const aspect=width/Math.max(1,height),portrait=aspect<.84;
+    if(id===7||id===10){
+      const river=id===7;
+      const points=river?[[7.6,.72,7.95],[12,-.9,1.9],[16,0,.2],[15.7,0,10],[14.16,1.60,8.36],[19.4,3,2.2]]:
+        [[-.8,0,7.5],[.4,2.35,7.85],[2.45,2.15,6.7],[8,.8,7.9],[11.9,.7,7.3]];
+      return fit(points,river?-.52:.58,river?.62:.58,aspect,.57);
+    }
     if(id){
       const b=districtPlaces[id-1];
-      return {center:b.center.slice(),yaw:b.yaw,tilt:id===6?.80:id===5?.46:id===4?.51:.31,
+      return {center:b.center.slice(),yaw:b.yaw,tilt:id===9?.59:id===8?.38:id===6?.80:id===5?.46:id===4?.51:.31,
         extent:Math.max(b.height*.61,b.width*.60/aspect)};
     }
-    const yaw=portrait?-.48:.48,tilt=portrait?.67:.62,[r,u]=axes(yaw,tilt);
+    const yaw=portrait?.58:.48,tilt=portrait?.90:.62;
     const points=[];
     if(!portrait){
       for(const x of [-5.4,2.6])for(const z of [-16,-8])points.push([x,-1.5,z]);
       for(const x of [-8,8])for(const z of [-8,8])for(const y of [-1.5,0])points.push([x,y,z]);
     }
-    for(const b of districtPlaces){
+    for(const b of districtPlaces.slice(0,6)){
       for(const d of [-1,1])for(const y of [0,b.height]){
         points.push([b.center[0]+d*b.width*.5,y,b.center[2]+.15]);
         points.push([b.center[0]+d*b.width*.5,y,b.center[2]-2.6]);
       }
     }
-    if(portrait)points.push([-4.9,-.4,3.5],[2.5,-.4,4.5]);
+    points.push([12.65,.74,6.37]);
+    if(!portrait)for(const x of [12.5,20.6])for(const z of [-.2,10.5])points.push([x,-1.82,z],[x,2.8,z]);
+    return fit(points,yaw,tilt,aspect,.54);
+  }
+  function fit(points,yaw,tilt,aspect,padding){
+    const [r,u]=axes(yaw,tilt);
     const xs=points.map(p=>dot(p,r)),ys=points.map(p=>dot(p,u));
     const left=Math.min(...xs),right=Math.max(...xs),top=Math.max(...ys),bottom=Math.min(...ys);
-    const center=[0,1,0],dx=(left+right)/2-dot(center,r),dy=(top+bottom)/2-dot(center,u);
-    const extent=Math.max((right-left)*.54/aspect,(top-bottom)*.545);
+    // Anchor rotation to this bank even when part of the other shore is visible.
+    const center=[0,1,2].map(i=>points.reduce((sum,p)=>sum+p[i],0)/points.length);
+    const dx=(left+right)/2-dot(center,r),dy=(top+bottom)/2-dot(center,u);
+    const extent=Math.max((right-left)*padding/aspect,(top-bottom)*Math.max(.545,padding));
     return {yaw,tilt,extent,center:center.map((v,i)=>v+r[i]*dx+u[i]*dy)};
   }
   function locationId(){return districtPlaces.find(b=>'#'+b.slug===location.hash)?.id||0;}
-  function address(id){
+  function address(id,crossing){
     const hash=id?'#'+districtPlaces[id-1].slug:'';
     if(location.hash===hash)return;
-    try{history.replaceState(null,'',location.pathname+location.search+hash);}catch{}
+    try{history[crossing?'pushState':'replaceState'](null,'',location.pathname+location.search+hash);}catch{}
   }
   function stopFlight(){transition=null;}
   function travel(id,instant=false,changeAddress=true){
+    const crossing=riverBank(focus)!==riverBank(id);
     focus=id;hover=0;
-    if(changeAddress)address(id);
+    if(changeAddress)address(id,crossing);
     const to=poseFor(id);
     if(instant||reduced.matches||!view){view=to;transition=null;}
     else{
       const delta=to.yaw-view.yaw;
       to.yaw=view.yaw+Math.atan2(Math.sin(delta),Math.cos(delta));
-      transition={from:view,to,start:performance.now()};
+      transition={from:view,to,start:performance.now(),crossing};
     }
     status.textContent=id?'正在参观'+districtPlaces[id-1].name+'。':'晴间街区全景。';
     request();
@@ -119,6 +138,7 @@ async function startDistrict(){
     request();
   }
   function activate(hit,type){
+    if(hit===30){crossBridge();return;}
     const owner=hit>10?hit-10:hit;
     if(owner<1||owner>districtPlaces.length)return;
     if(hit>10&&(type!=='touch'||focus===owner))interact(owner);
@@ -126,6 +146,10 @@ async function startDistrict(){
     else if(owner===1)interact(1);
     else travel(owner);
   }
+  function crossBridge(){
+    if(!transition?.crossing)travel(riverBank(focus)?10:7);
+  }
+  function localOverview(){travel(riverBank(focus)?7:0);}
   function project(point){
     const m=lastMatrix,[x,y,z]=point;
     return [(1+m[0]*x+m[4]*y+m[8]*z+m[12])*width/2,
@@ -167,7 +191,8 @@ async function startDistrict(){
   }
   function keyAction(key){
     if(key==='m'){status.textContent=audio.toggle()?'已静音。':'声音已打开。';return;}
-    if(key==='home'||key==='escape'){travel(0);return;}
+    if(key==='b'){crossBridge();return;}
+    if(key==='home'||key==='escape'){localOverview();return;}
     if(['1','2','3','4','5','6'].includes(key)){travel(Number(key));return;}
     if((key==='enter'||key===' ')&&focus)interact(focus);
   }
@@ -180,10 +205,11 @@ async function startDistrict(){
     frame=0;
     if(!visible||document.hidden)return;
     if(transition){
-      const {from,to,start:t0}=transition,p=clamp((now-t0)/650,0,1),s=smooth(p);
+      const {from,to,start:t0,crossing}=transition,p=clamp((now-t0)/(crossing?1100:650),0,1),s=smooth(p);
       view={yaw:lerp(from.yaw,to.yaw,s),tilt:lerp(from.tilt,to.tilt,s),
         extent:Math.exp(lerp(Math.log(from.extent),Math.log(to.extent),s)),
-        center:from.center.map((v,i)=>lerp(v,to.center[i],s))};
+        center:from.center.map((v,i)=>crossing?
+          lerp(lerp(v,[10.25,.62,7.14][i],s),lerp([10.25,.62,7.14][i],to.center[i],s),s):lerp(v,to.center[i],s))};
       if(p===1)transition=null;
     }
     const time=(now-start)/1000,windAge=(now-clothStart)/1000,windPhase=(time+14)%27;
@@ -227,7 +253,7 @@ async function startDistrict(){
     width=w;height=h;travel(focus,true,false);
   }
   focus=locationId();layout();
-  attachDistrictGestures(canvas,{pick,activate,pan,zoom,reset:()=>travel(0),unlockSound:audio.wake,keyAction,
+  attachDistrictGestures(canvas,{pick,activate,pan,zoom,reset:localOverview,unlockSound:audio.wake,keyAction,
     highlight(id){if(id!==hover){hover=id;request();}},
     orbit(dx,dy){navigating();view.yaw-=dx*.0065;view.tilt=clamp(view.tilt+dy*.0055,-1.12,1.49);}
   });

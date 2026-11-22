@@ -1,15 +1,15 @@
 // Project the actual roof panels, foliage, awnings and pavement along the fall
 // vector once. A drop stops at its first receiving surface, from any viewpoint.
 function buildDistrictRainShelter(batches,leanX,leanZ){
-  const cells=97,rows=145,scale=(cells-1)/16,heights=new Float32Array(cells*rows);
-  heights.fill(-.145);
+  const scale=6,cells=175,rows=163,heights=new Float32Array(cells*rows);
+  heights.fill(-.92);
   for(const batch of batches){
     if(['sparrow','nearWing','farWing'].includes(batch.motion))continue;
     if(batch.motion==='drops'||batch.motion==='can'||batch.motion==='wheel'||batch.motion==='cloth')continue;
     const v=batch.data;
     for(let i=0;i<batch.used;i+=33){
       const ay=v[i+1],by=v[i+12],cy=v[i+23];
-      if(Math.max(ay,by,cy)<-.14)continue;
+      if(Math.max(ay,by,cy)<-.92)continue;
       const ax=(v[i]+ay*leanX+8)*scale,az=(v[i+2]+ay*leanZ+16)*scale;
       const bx=(v[i+11]+by*leanX+8)*scale-ax,bz=(v[i+13]+by*leanZ+16)*scale-az;
       const cx=(v[i+22]+cy*leanX+8)*scale-ax,cz=(v[i+24]+cy*leanZ+16)*scale-az;
@@ -111,6 +111,7 @@ function createDistrictDrizzle(gl,batches=[]){
         const key=Math.imul(cycle+11,10607)+i*383;
         t.x=-7.51+noise(key)*15.03;t.z=-7.73+noise(key+4)*15.32;
         if(i%5===0){t.x=-5.15+noise(key)*7.5;t.z=-15.7+noise(key+4)*7.6;}
+        else if(i%3===1){t.x=8.12+noise(key)*12.22;t.z=.04+noise(key+4)*10.2;}
         t.top=5.80+noise(key+19)*2.04;t.floor=shelter(t.x,t.z);
         t.gate=noise(key+9);
       }

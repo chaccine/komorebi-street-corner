@@ -10,6 +10,7 @@
 | [巷尾花店](https://chaccine.github.io/komorebi-street-corner/district/#florist) | 顺着修理棚旁的石板巷到玻璃花房，点门边的青绿水壶浇花。 |
 | [旧书报亭](https://chaccine.github.io/komorebi-street-corner/district/#newsstand) | 点长椅旁摊开的报纸，听纸页翻动，露出夕阳下的巷尾花店插画。再点一次翻回头版。 |
 | [石阶小庭](https://chaccine.github.io/komorebi-street-corner/district/#courtyard) | 修理棚后、花店小巷旁。点石钵，麻雀扑上矮墙，歇一会儿再跳回钵沿。 |
+| [沿河小街](https://chaccine.github.io/komorebi-street-corner/district/#riverside) | 从旧书报亭沿栏杆走到石桥。点桥面到对岸，看步道边的红邮筒和伸入水中的石阶。再点同一座桥回书报亭。 |
 
 ## 怎么逛
 
@@ -17,7 +18,7 @@
 
 手机竖屏会从茶铺一侧望向街区。单指拖动旋转，双指捏合缩放，双指同向移动可以平移。先点建筑靠近，再点细节互动。两指同时轻点可切换静音。横竖屏切换时会重新取景，保留正在看的建筑。
 
-双击空白处回到全景。键盘可用 1、2、3、4、5、6 选地点，用回车或空格互动，Home 或 Esc 返回，M 切换静音。声音在首次操作后启用。
+双击空白处回到所在岸的全景。在茶铺近景可先双击空地，沿书报亭旁的栏杆找到桥。点红邮筒或亲水石阶可以靠近。浏览器后退、前进可重访上一次过桥的位置。键盘可用 1 至 6 选生活街地点，用回车或空格互动，B 过桥，Home 或 Esc 回到当前岸的全景，M 切换静音。声音在首次操作后启用。
 
 ## 本地运行
 
@@ -41,3 +42,5 @@ python -B build.py
 安装 Python 的 Playwright 包与 Chromium 后，运行 `python -B checks/check_district.py`。测试会在浏览器中实际点选五栋建筑，检查灯光、车轮、床单、浇水、翻页、纸声和直达链接，再用三倍像素密度的触屏模拟检查捏合、点按和返回。可用 `--chrome` 指定浏览器路径，或传入试玩网址来检查已发布版本。
 
 运行 `python -B checks/check_courtyard.py` 可单独检查石钵点按、麻雀的两个落脚点、水面涟漪、扑翅与鸟叫声，以及静音后再次互动。也可传入街区试玩网址。
+
+河岸与小桥的模型在 `src/riverside.js`。运行 `python -B checks/check_riverside.py` 可检查桌面和两种竖屏宽度下从茶铺过河、拖动、原桥返回和浏览器前进后退，也可传入试玩网址。

@@ -236,6 +236,8 @@ function createDistrictRenderer(canvas,geometry){
     if(stage==1){
       vec2 edge=abs(world.xz)-vec2(7.96);
       float outside=length(max(edge,vec2(0.)))+min(max(edge.x,edge.y),0.);
+      vec2 quay=abs(world.xz-vec2(14.30,5.15))-vec2(6.25,5.29);
+      outside=min(outside,length(max(quay,vec2(0.)))+min(max(quay.x,quay.y),0.));
       float near=exp(-max(0.,outside)*2.35);
       vec2 shift=(world.xz-vec2(.7,-.65))/vec2(10.,10.1);
       float pool=exp(-dot(shift,shift)*.83),halo=exp(-dot(world.xz,world.xz)/790.);
@@ -307,8 +309,12 @@ function createDistrictRenderer(canvas,geometry){
   const direction=districtUnit([-.66,1.55,.83]);
   const right=districtUnit(districtCross([0,1,0],direction)),up=districtCross(direction,right);
   const solar=new Float32Array(16);
-  for(let j=0;j<3;j++){solar[4*j]=right[j]/16.;solar[4*j+1]=up[j]/16.;solar[4*j+2]=-direction[j]/24.;}
-  solar[12]=(right[2]*3.8-right[1]*1.15)/16;solar[13]=(up[2]*3.8-up[1]*1.15)/16;solar[14]=direction[1]*1.15/24;solar[15]=1;
+  const lightCenter=[5.7,1,-2],lightExtent=22;
+  for(let j=0;j<3;j++){
+    solar[4*j]=right[j]/lightExtent;solar[4*j+1]=up[j]/lightExtent;solar[4*j+2]=-direction[j]/28;
+    for(let i=0;i<3;i++)solar[12+i]-=lightCenter[j]*solar[4*j+i];
+  }
+  solar[15]=1;
   function initialize(){
     const deletes=[],buffers=new Map(),blank=gl.createVertexArray();
     deletes.push(()=>gl.deleteVertexArray(blank));
