@@ -154,7 +154,7 @@ function createDistrictRenderer(canvas,geometry){
   layout(location=0)in vec3 pos;layout(location=1)in vec3 norm;
   layout(location=2)in vec3 paint;layout(location=3)in vec2 st;
   uniform mat4 view,solar;uniform int movement;
-  uniform float angle,cloth,clothAmplitude,clothTop,clothHeight;
+  uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water;
   out vec3 normal,color,world,sun;out vec2 uv;
   void main(){
     vec3 p=pos,n=norm;
@@ -176,8 +176,25 @@ function createDistrictRenderer(canvas,geometry){
       n.yz=mat2(cs,-sn,sn,cs)*n.yz;
       n.x+=gust*free*.21*cos(4.8*cloth-p.x*2.7+p.y*.70);
     }
+    float tilt=.90*smoothstep(0.,.48,water)*(1.-smoothstep(1.85,2.45,water));
+    mat2 pour=mat2(cos(tilt),sin(tilt),-sin(tilt),cos(tilt));
+    vec2 hinge=vec2(-.22,1.06);
+    if(movement==4){p.xy=hinge+pour*(p.xy-hinge);n.xy=pour*n.xy;}
+    if(movement==5){
+      float j=floor(pos.x+1.90);
+      float age=fract((water-.44)*2.7+j*.618);
+      vec2 tip=hinge+pour*vec2(-.63,.31);
+      p=vec3(tip,-10.75)+pos-vec3(j-1.4,0.,-12.6);
+      p+=vec3(-.32*age,-.59*age*age,.09*sin(j*1.73)*age);
+      if(water<.44||water>1.93)p.y=-8.;
+    }
+    if(movement==6 && water>.48){
+      float h=max(0.,p.y-.57);
+      p.x+=h*.13*sin(21.*water+pos.z*9.)*smoothstep(.48,.69,water)*(1.-smoothstep(1.85,2.45,water));
+    }
     world=p;normal=n;color=paint;uv=st;
     sun=(solar*vec4(p,1.)).xyz*.5+.5;gl_Position=view*vec4(p,1.);
+    if(movement==5&&(water<.44||water>1.93))gl_Position=vec4(2.,2.,2.,1.);
   }`;
   const fragment=`#version 300 es
   precision highp float;precision highp int;
@@ -217,6 +234,11 @@ function createDistrictRenderer(canvas,geometry){
       float glow=.51+.16*clamp(pigment.g,0.,1.);
       lit=mix(lit,vec3(1.,.775,.425),phase*glow);
     }
+    if(movement==7){
+      float stripe=fract((world.x+.42*world.z+.25*eye.x)*.39);
+      float gleam=smoothstep(.54,.57,stripe)*(1.-smoothstep(.64,.66,stripe));
+      lit=mix(vec3(.66,.85,.78),vec3(.96,.98,.86),.19+.53*gleam);
+    }
     if(id==hover&&hover>0)lit=mix(lit,vec3(1.,.92,.69),.105);
     outColor=vec4(clamp(lit,0.,1.),float(id)/255.);
   }`;
@@ -248,8 +270,8 @@ function createDistrictRenderer(canvas,geometry){
   const direction=districtUnit([-.66,1.55,.83]);
   const right=districtUnit(districtCross([0,1,0],direction)),up=districtCross(direction,right);
   const solar=new Float32Array(16);
-  for(let j=0;j<3;j++){solar[4*j]=right[j]/13.;solar[4*j+1]=up[j]/13.;solar[4*j+2]=-direction[j]/24.;}
-  solar[12]=-right[1]*1.15/13;solar[13]=-up[1]*1.15/13;solar[14]=direction[1]*1.15/24;solar[15]=1;
+  for(let j=0;j<3;j++){solar[4*j]=right[j]/16.;solar[4*j+1]=up[j]/16.;solar[4*j+2]=-direction[j]/24.;}
+  solar[12]=(right[2]*3.8-right[1]*1.15)/16;solar[13]=(up[2]*3.8-up[1]*1.15)/16;solar[14]=direction[1]*1.15/24;solar[15]=1;
   function initialize(){
     const deletes=[],buffers=new Map(),blank=gl.createVertexArray();
     deletes.push(()=>gl.deleteVertexArray(blank));
@@ -265,7 +287,7 @@ function createDistrictRenderer(canvas,geometry){
       const loc={pr};for(const name of names.split(' '))loc[name]=gl.getUniformLocation(pr,name);
       return loc;
     }
-    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight atlas';
+    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water atlas';
     const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover');
     const shadow=makeProgram(vertex,shadowFragment,motionUniforms);
     const screen=makeProgram(screenVS,screenFS,'image depthMap stroke');
@@ -297,7 +319,7 @@ function createDistrictRenderer(canvas,geometry){
     gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
     function check(){if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Incomplete WebGL drawing target');}
     check();
-    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowCloth=0,shadowTime=-Infinity;
+    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowWater=0,shadowCloth=0,shadowTime=-Infinity;
     function bind(unit,t){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);}
     function resize(state,rect){
       const q=Math.min(state.quality||1,maxEdge/Math.max(rect.width,rect.height,1));
@@ -321,7 +343,7 @@ function createDistrictRenderer(canvas,geometry){
         buffers.set(g,vao);deletes.push(()=>{gl.deleteVertexArray(vao);gl.deleteBuffer(buf);});
       }
       gl.bindVertexArray(buffers.get(g));
-      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3}[g.motion]||0);
+      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7}[g.motion]||0);
       if(g.motion==='cloth'){
         gl.uniform1f(loc.clothTop,g.hi[1]);gl.uniform1f(loc.clothHeight,g.hi[1]-g.lo[1]);
       }
@@ -332,6 +354,7 @@ function createDistrictRenderer(canvas,geometry){
       gl.useProgram(loc.pr);gl.uniformMatrix4fv(loc.view,false,view);
       gl.uniformMatrix4fv(loc.solar,false,solar);
       gl.uniform1f(loc.angle,state.wheelAngle||0);gl.uniform1f(loc.cloth,state.clothTime||0);
+      gl.uniform1f(loc.water,state.water||0);
       gl.uniform1f(loc.clothAmplitude,state.clothAmplitude??1);
       bind(0,atlas);gl.uniform1i(loc.atlas,0);
     }
@@ -357,13 +380,13 @@ function createDistrictRenderer(canvas,geometry){
       const visible=batches.filter(g=>visibleDetail(g,state,pixels));
       const lod=visible.map(g=>g.id+'/'+g.nearOnly+'/'+g.motion).join(',');
       const angle=state.wheelAngle||0,cloth=state.clothTime||0,now=performance.now();
-      const changed=angle!==shadowAngle||cloth!==shadowCloth;
+      const changed=angle!==shadowAngle||cloth!==shadowCloth||state.water!==shadowWater;
       gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.DITHER);
-      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0))){
-        shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
+      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0||!state.water&&shadowWater>0))){
+        shadowWater=state.water;shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
         gl.bindFramebuffer(gl.FRAMEBUFFER,sunTarget);gl.viewport(0,0,shadowSize,shadowSize);
         gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1.35,2.0);
-        shared(shadow,solar,state);for(const b of visible)drawBatch(b,shadow);
+        shared(shadow,solar,state);for(const b of visible)if(b.motion!=='glass'&&b.motion!=='drops')drawBatch(b,shadow);
         gl.disable(gl.POLYGON_OFFSET_FILL);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.viewport(0,0,w,h);
@@ -372,7 +395,12 @@ function createDistrictRenderer(canvas,geometry){
       gl.uniform3fv(scene.eye,state.eye||[.2,.5,.8]);gl.uniform3fv(scene.light,direction);
       gl.uniform1f(scene.lamp,state.lamp||0);gl.uniform1i(scene.hover,state.hover||0);
       if(!state.eye||state.eye[1]>.025){gl.uniform1i(scene.stage,1);drawBatch(floor,scene);}
-      gl.uniform1i(scene.stage,0);for(const b of visible)drawBatch(b,scene);
+      gl.uniform1i(scene.stage,0);for(const b of visible)if(b.motion!=='glass')drawBatch(b,scene);
+      // Blend the pane colour but keep a precisely selectable roof in the ID channel.
+      gl.enable(gl.BLEND);gl.blendColor(0,0,0,.46);
+      gl.blendFuncSeparate(gl.CONSTANT_ALPHA,gl.ONE_MINUS_CONSTANT_ALPHA,gl.ONE,gl.ZERO);
+      for(const b of visible)if(b.motion==='glass')drawBatch(b,scene);
+      gl.disable(gl.BLEND);
       gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.disable(gl.DEPTH_TEST);gl.useProgram(screen.pr);
       bind(0,paint);bind(1,depth);gl.uniform1i(screen.image,0);gl.uniform1i(screen.depthMap,1);
       const radius=Math.max(.85,.68*w/Math.max(1,rect.width));

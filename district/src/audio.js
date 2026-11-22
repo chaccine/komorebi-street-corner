@@ -20,7 +20,7 @@ function createDistrictAudio(){
   }
   function makeSample(kind){
     if(samples.has(kind))return samples.get(kind);
-    const length={wheel:wheelDuration+.075,cloth:1.55,light:.13}[kind];
+    const length={wheel:wheelDuration+.075,cloth:1.55,light:.13,water:2.12}[kind];
     const buffer=context.createBuffer(1,Math.ceil(rate*length),rate),out=buffer.getChannelData(0);
     let seed=739;
     function noise(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;}
@@ -41,6 +41,13 @@ function createDistrictAudio(){
         const speed=Math.sqrt(1-tooth*toothAngle/wheelTravel);
         tick(wheelDuration*(1-speed),(.33+.34*speed)*(.92+.08*noise()),1380+310*speed);
       }
+    }else if(kind==='water'){
+      let low=0;
+      for(let i=Math.floor(.45*rate);i<out.length;i++){
+        const t=i/rate, swell=Math.min(1,(t-.45)*6,(length-t)*5);
+        low+=.16*(noise()-low);out[i]=.36*swell*low;
+      }
+      for(let t=.5;t<2;t+=.033+.047*(1+noise()))tick(t,.22+.10*noise(),670+360*noise());
     }else if(kind==='light'){
       tick(0,.69,760);tick(.023,.32,521);
     }else{
@@ -59,7 +66,8 @@ function createDistrictAudio(){
     const dx=m[0]*x+m[4]*y+m[8]*z+m[12],dy=m[1]*x+m[5]*y+m[9]*z+m[13];
     const t=context.currentTime;
     if(voice.pan)voice.pan.pan.setTargetAtTime(Math.max(-.85,Math.min(.85,dx*.82)),t,.06);
-    voice.gain.gain.setTargetAtTime(.92/(1+.7*(dx*dx+dy*dy)),t,.08);
+    const proximity=voice.kind==='water'?Math.min(1, .22+2.4*Math.hypot(m[1],m[5],m[9])):1;
+    voice.gain.gain.setTargetAtTime(.92*proximity/(1+.7*(dx*dx+dy*dy)),t,.08);
   }
   function play(kind,pos){
     if(!context||muted||!visible||voices.size>12)return;
@@ -69,7 +77,7 @@ function createDistrictAudio(){
     const pan=context.createStereoPanner?context.createStereoPanner():null;
     source.connect(gain);
     if(pan){gain.connect(pan);pan.connect(master);}else gain.connect(master);
-    const v={source,gain,pan,pos};place(v);voices.add(v);
+    const v={source,gain,pan,pos,kind};place(v);voices.add(v);
     if(kind==='wheel')spinVoice=v;
     source.onended=()=>{voices.delete(v);if(spinVoice===v)spinVoice=null;source.disconnect();gain.disconnect();pan?.disconnect();};
     source.start();

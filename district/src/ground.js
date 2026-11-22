@@ -261,10 +261,11 @@ function buildDistrictGround(g) {
   flat([[-7.98,-5.54],[6.90,-5.54],[6.90,-4.69],[-7.98,-4.69]],-.0046,'#a8a997');
   for(let i=0;i<25;i++){
     const x=-7.69+i*.592;
+    if(Math.abs(x+2.05)<.70)continue;
     box(x,.12,-5.69,.574,.254,.238,pick(['#939984','#979987','#999986']));
     box(x,.264,-5.69,.582,.044,.252,pick(['#b0b09a','#afae98','#a4ad8c']));
   }
-  for(const x of [-6.52,-2.54,1.66,4.34]){
+  for(const x of [-6.52,-3.35,1.66,4.34]){
     for(let i=0;i<5;i++){
       const xx=x+range(-.51,.51),z=range(-7.48,-6.02);
       moss(xx,z,.001,1.4);grass(xx,.002,z,1.0);
@@ -341,4 +342,28 @@ function buildDistrictGround(g) {
     }
   }
   g.ball([pineX-.06,3.05,pineZ-.07],[.41,.22,.34],'#8ba66f',8,4);
+
+  // The florist's eight-metre square shares its front edge with the old yard.
+  box(-1.4,-.98,-12,8,1.00,8,'#999581');
+  box(-1.4,-.30,-12,8,.36,8,'#b5ae98');
+  box(-1.4,-.063,-12,8,.114,8,'#a9ad88');
+  for(let i=0;i<32;i++){
+    const x=range(-5.3,2.48),z=range(-15.9,-8.1);
+    if(z<-14.39||x>1.7||x<-4.38){moss(x,z,.005,.65);grass(x,.01,z,.85);}
+  }
+  for(let j=0;j<25;j++){
+    const z=1.2-j*.49;
+    for(let k=0;k<2;k++){
+      const x=-2.24+k*.38;
+      box(x,.018,z,.36,.042,.466,pick(['#c5bea7','#c5b89c','#d4cbb5','#bcb79f']));
+    }
+    box(-1.62,.012,z,.12,.036,.48,'#777f71');
+    if(j%5===2)for(let k=0;k<4;k++)box(-1.62,.034,z-.18+k*.10,.145,.018,.024,'#a4a390');
+    if(j%4===1)moss(-2.49,z,.041,.27);
+  }
+  for(let i=0;i<7;i++){
+    const x=-5+i*1.15;
+    box(x,.42,-15.81,.10,.88,.10,'#8a8066');
+    if(i<6)for(const y of [.33,.63])box(x+.575,y,-15.81,1.17,.09,.065,'#a59977');
+  }
 }

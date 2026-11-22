@@ -45,7 +45,7 @@ PROBE = r"""
     if(!state?.post||!sceneTarget)return;
     const s=programs.get(scene);
     q.last={view:s.view,scale:Math.hypot(s.view[0],s.view[4],s.view[8]),
-      lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
+      water:s.water,lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
       time:performance.now(),size:[this.drawingBufferWidth,this.drawingBufferHeight]};
     q.history.push(q.last);if(q.history.length>550)q.history.shift();
   });
@@ -148,7 +148,7 @@ def desktop(browser, url, captures, width, height):
         ready(page,url)
         resting_camera(page)
         counts=page.evaluate('districtCheck.objects()')
-        assert all(counts.get(str(k),0)>24 for k in (1,2,3,11,12,13)),counts
+        assert all(counts.get(str(k),0)>24 for k in (1,2,3,4,11,12,13)),counts
         screenshot(page,captures,'desktop-district')
         overview=page.evaluate('districtCheck.last.scale')
         original=page.evaluate('districtCheck.last.view')
@@ -165,7 +165,7 @@ def desktop(browser, url, captures, width, height):
         wait(page,f"districtCheck.last.scale>{overview*1.17}")
         page.keyboard.press('Home')
         resting_camera(page)
-        for building,route in enumerate(('tea','cycles','flats'),1):
+        for building,route in enumerate(('tea','cycles','flats','florist'),1):
             select(page,building)
             expect_hash(page,'#'+route)
             close=page.evaluate('districtCheck.last.scale')
@@ -180,6 +180,8 @@ def desktop(browser, url, captures, width, height):
                 wait(page,f"Math.abs(districtCheck.last.lamp-{before['lamp']})>.6")
             elif route=='cycles':
                 wait(page,f"Math.abs(districtCheck.last.angle-{before['angle']})>.55")
+            elif route=='florist':
+                wait(page,'districtCheck.last.water>.50')
             else:
                 wait(page,f"districtCheck.history.some(f=>f.time>{before['time']} && f.cloth>0 && f.amplitude>.45)")
             after=page.evaluate('id=>districtCheck.object(id)',action)
@@ -189,7 +191,7 @@ def desktop(browser, url, captures, width, height):
             page.keyboard.press('Home')
             expect_hash(page,'')
             assert abs(page.evaluate('districtCheck.last.scale')-overview)<.002
-        for index,route in enumerate(('tea','cycles','flats'),1):
+        for index,route in enumerate(('tea','cycles','flats','florist'),1):
             page.goto('about:blank')
             ready(page,url+'#'+route)
             expect_hash(page,'#'+route)
@@ -197,7 +199,7 @@ def desktop(browser, url, captures, width, height):
             assert page.evaluate('id=>districtCheck.object(id).n',index+10)>80
         assert not failures,failures
         assert page.evaluate('districtCheck.glError()')==0
-        print('Desktop: six visible pick surfaces, drag/zoom, three focus routes, lamp/rim/cloth pixels, Home and fresh deep links passed',flush=True)
+        print('Desktop: four buildings, drag/zoom, four focus routes, lamp/rim/cloth pixels, Home and fresh deep links passed',flush=True)
     finally:
         ctx.close()
 
@@ -241,7 +243,7 @@ def mobile(browser, url, captures):
         # Preserve a human double-tap cadence even if software WebGL blocks
         # the browser's main thread between native events.
         viewport=page.viewport_size
-        blank={'x':viewport['width']*.045,'y':viewport['height']*.055,'id':1}
+        blank={'x':viewport['width']*.50,'y':viewport['height']*.82,'id':1}
         touched=time()
         for offset,pressed in ((0,True),(.035,False),(.145,True),(.18,False)):
             device.send('Input.dispatchTouchEvent',{
@@ -252,6 +254,20 @@ def mobile(browser, url, captures):
         assert abs(page.evaluate('districtCheck.last.scale')-overview['scale'])<.002
         assert not failures,failures
         assert page.evaluate('districtCheck.glError()')==0
+        select(page,4,touch=True)
+        expect_hash(page,'#florist')
+        select(page,14,touch=True)
+        wait(page,'districtCheck.last.water>.50')
+        screenshot(page,captures,'mobile-florist')
+        page.set_viewport_size({'width':844,'height':390})
+        resting_camera(page)
+        assert page.evaluate('location.hash')=='#florist'
+        wait(page,'districtCheck.last.water===0')
+        select(page,14,touch=True)
+        wait(page,'districtCheck.last.water>.50')
+        assert not failures,failures
+        assert page.evaluate('districtCheck.glError()')==0
+        print('Mobile florist: portrait and landscape taps passed')
         print('Mobile: native 1170x2532, real two-finger pinch, no false tap, two-step wheel action and double-tap overview passed',flush=True)
     finally:
         ctx.close()

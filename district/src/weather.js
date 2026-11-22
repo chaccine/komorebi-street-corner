@@ -1,21 +1,21 @@
 // Project the actual roof panels, foliage, awnings and pavement along the fall
 // vector once. A drop stops at its first receiving surface, from any viewpoint.
 function buildDistrictRainShelter(batches,leanX,leanZ){
-  const cells=97,scale=(cells-1)/16,heights=new Float32Array(cells*cells);
+  const cells=97,rows=145,scale=(cells-1)/16,heights=new Float32Array(cells*rows);
   heights.fill(-.145);
   for(const batch of batches){
-    if(batch.motion==='wheel'||batch.motion==='cloth')continue;
+    if(batch.motion==='drops'||batch.motion==='can'||batch.motion==='wheel'||batch.motion==='cloth')continue;
     const v=batch.data;
     for(let i=0;i<batch.used;i+=33){
       const ay=v[i+1],by=v[i+12],cy=v[i+23];
       if(Math.max(ay,by,cy)<-.14)continue;
-      const ax=(v[i]+ay*leanX+8)*scale,az=(v[i+2]+ay*leanZ+8)*scale;
-      const bx=(v[i+11]+by*leanX+8)*scale-ax,bz=(v[i+13]+by*leanZ+8)*scale-az;
-      const cx=(v[i+22]+cy*leanX+8)*scale-ax,cz=(v[i+24]+cy*leanZ+8)*scale-az;
+      const ax=(v[i]+ay*leanX+8)*scale,az=(v[i+2]+ay*leanZ+16)*scale;
+      const bx=(v[i+11]+by*leanX+8)*scale-ax,bz=(v[i+13]+by*leanZ+16)*scale-az;
+      const cx=(v[i+22]+cy*leanX+8)*scale-ax,cz=(v[i+24]+cy*leanZ+16)*scale-az;
       const area=bx*cz-bz*cx;
       if(Math.abs(area)<.0001)continue;
       const x0=Math.max(0,Math.ceil(ax+Math.min(0,bx,cx))),x1=Math.min(cells-1,Math.floor(ax+Math.max(0,bx,cx)));
-      const z0=Math.max(0,Math.ceil(az+Math.min(0,bz,cz))),z1=Math.min(cells-1,Math.floor(az+Math.max(0,bz,cz)));
+      const z0=Math.max(0,Math.ceil(az+Math.min(0,bz,cz))),z1=Math.min(rows-1,Math.floor(az+Math.max(0,bz,cz)));
       for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){
         const u=((x-ax)*cz-(z-az)*cx)/area,w=(bx*(z-az)-bz*(x-ax))/area;
         if(u<0||w<0||u+w>1)continue;
@@ -26,7 +26,7 @@ function buildDistrictRainShelter(batches,leanX,leanZ){
   }
   return (x,z)=>{
     const col=Math.max(0,Math.min(cells-2,Math.floor((x+8)*scale)));
-    const row=Math.max(0,Math.min(cells-2,Math.floor((z+8)*scale))),i=row*cells+col;
+    const row=Math.max(0,Math.min(rows-2,Math.floor((z+16)*scale))),i=row*cells+col;
     return Math.max(heights[i],heights[i+1],heights[i+cells],heights[i+cells+1]);
   };
 }
@@ -109,6 +109,7 @@ function createDistrictDrizzle(gl,batches=[]){
         t.cycle=cycle;
         const key=Math.imul(cycle+11,10607)+i*383;
         t.x=-7.51+noise(key)*15.03;t.z=-7.73+noise(key+4)*15.32;
+        if(i%5===0){t.x=-5.15+noise(key)*7.5;t.z=-15.7+noise(key+4)*7.6;}
         t.top=5.80+noise(key+19)*2.04;t.floor=shelter(t.x,t.z);
         t.gate=noise(key+9);
       }

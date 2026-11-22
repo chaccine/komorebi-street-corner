@@ -1,7 +1,8 @@
 const districtPlaces=[
   {id:1,slug:'tea',name:'晴间茶铺',center:[-4.65,1.90,.04],width:4.65,height:4.30,yaw:.15,feature:[-4.65,2.97,.67]},
   {id:2,slug:'cycles',name:'自行车修理棚',center:[.32,1.37,-.64],width:3.75,height:3.0,yaw:.16,feature:[.45,1.98,-.28]},
-  {id:3,slug:'flats',name:'外廊公寓',center:[4.90,2.65,-.44],width:3.95,height:5.65,yaw:.29,feature:[5.35,4.45,.28]}
+  {id:3,slug:'flats',name:'外廊公寓',center:[4.90,2.65,-.44],width:3.95,height:5.65,yaw:.29,feature:[5.35,4.45,.28]},
+  {id:4,slug:'florist',name:'巷尾花店',center:[-1.4,1.42,-12.18],width:5.75,height:3.65,yaw:-.23,feature:[-.22,1.06,-10.75]}
 ];
 
 async function startDistrict(){
@@ -22,6 +23,7 @@ async function startDistrict(){
   let interactionUntil=0,lastTimedFrame=0,slowFrames=0,economyUntil=0;
   let width=0,height=0,view=null,lastMatrix=null,lastEye=null;
   let wheelStart=-Infinity,wheelBase=0,clothStart=-Infinity;
+  let waterStart=-Infinity;
   let lightStart=-Infinity,lightFrom=0,lightTo=0;
   function axes(yaw,tilt){
     const x=Math.sin(yaw),z=Math.cos(yaw),s=Math.sin(tilt),c=Math.cos(tilt);
@@ -37,12 +39,13 @@ async function startDistrict(){
     const aspect=width/Math.max(1,height),portrait=aspect<.84;
     if(id){
       const b=districtPlaces[id-1];
-      return {center:b.center.slice(),yaw:b.yaw,tilt:.31,
+      return {center:b.center.slice(),yaw:b.yaw,tilt:id===4?.51:.31,
         extent:Math.max(b.height*.61,b.width*.60/aspect)};
     }
-    const yaw=portrait?-.69:.31,tilt=portrait?.49:.48,[r,u]=axes(yaw,tilt);
+    const yaw=portrait?-.48:.48,tilt=portrait?.67:.62,[r,u]=axes(yaw,tilt);
     const points=[];
     if(!portrait){
+      for(const x of [-5.4,2.6])for(const z of [-16,-8])points.push([x,-1.5,z]);
       for(const x of [-8,8])for(const z of [-8,8])for(const y of [-1.5,0])points.push([x,y,z]);
     }
     for(const b of districtPlaces){
@@ -93,14 +96,17 @@ async function startDistrict(){
     }else if(id===2){
       wheelBase=currentWheel(now)%(2*Math.PI);wheelStart=now;
       audio.play('wheel',b.feature);status.textContent='车轮开始空转，棘轮声渐渐放慢。';
-    }else{
+    }else if(id===3){
       clothStart=now;audio.play('cloth',b.feature);status.textContent='风掀起床单，露出栏杆后面的植物。';
+    }else if(id===4){
+      if(now-waterStart<2450)return;
+      waterStart=now;audio.play('water',b.feature);status.textContent='水壶倾向花槽，水滴落进泥土，花叶轻轻晃动。';
     }
     request();
   }
   function activate(hit,type){
     const owner=hit>10?hit-10:hit;
-    if(owner<1||owner>3)return;
+    if(owner<1||owner>districtPlaces.length)return;
     if(hit>10&&(type!=='touch'||focus===owner))interact(owner);
     else if(focus!==owner){travel(owner);if(owner===1&&!lightTo)interact(1);}
     else if(owner===1)interact(1);
@@ -148,7 +154,7 @@ async function startDistrict(){
   function keyAction(key){
     if(key==='m'){status.textContent=audio.toggle()?'已静音。':'声音已打开。';return;}
     if(key==='home'||key==='escape'){travel(0);return;}
-    if(['1','2','3'].includes(key)){travel(Number(key));return;}
+    if(['1','2','3','4'].includes(key)){travel(Number(key));return;}
     if((key==='enter'||key===' ')&&focus)interact(focus);
   }
   function request(){
@@ -171,7 +177,8 @@ async function startDistrict(){
     const cloth=reduced.matches?0:Math.max(natural,pulse(windAge,2.7));
     const rainPhase=(time+32)%57,rain=reduced.matches?0:pulse(rainPhase,11);
     const spinning=now-wheelStart<wheelDuration*1000;
-    const animating=!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
+    const age=(now-waterStart)/1000, watering=age>=0&&age<2.45;
+    const animating=watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
     const period=now-lastTimedFrame;
     if(lastTimedFrame&&period>52&&period<3000){if(++slowFrames>=5)economyUntil=now+4500;}
     else slowFrames=0;
@@ -184,7 +191,7 @@ async function startDistrict(){
     const {matrix,eye}=matrixOf(view);lastMatrix=matrix;lastEye=eye;audio.setView(matrix);
     const angle=reduced.matches&&Number.isFinite(wheelStart)?wheelBase+wheelTravel:currentWheel(now);
     scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,
-      wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
+      water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
       rainTime:time,rainAmount:rain});
     if(!canvas.dataset.ready){canvas.dataset.ready='true';document.querySelector('.poster')?.remove();}
     if(animating){
