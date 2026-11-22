@@ -19,7 +19,7 @@ async function startDistrict(){
   // Let the cover reach the screen before outlining the thousands of small faces.
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   const mesh=createDistrictGeometry();
-  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);buildRiverside(mesh);
+  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);buildRiverside(mesh);buildAfternoon(mesh);
   const scene=createDistrictRenderer(canvas,mesh);
   const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
   const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -157,6 +157,7 @@ async function startDistrict(){
   }
   function pick(x,y,type){
     let id=scene.pick(x,y,type==='touch');
+    if(id>=40)return -1;
     // Hit the empty spaces between spokes as well as the rim. Keep other buildings in front.
     if(lastMatrix&&lastEye[2]>.22&&(id===2||id===0)){
       const b=districtPlaces[1].feature,center=project(b);
@@ -234,14 +235,28 @@ async function startDistrict(){
       4096/Math.max(width,height),Math.sqrt(budget/area));
     const bird=courtyardBirdPose(birdAge,reduced.matches);
     const {matrix,eye}=matrixOf(view);lastMatrix=matrix;lastEye=eye;audio.setView(matrix,bird.offset);
+    // Test the whole walking route so that someone about to enter the view wakes it up.
+    function inFrame(x,y,z,rx,ry,rz){
+      for(let i=0;i<2;i++){
+        const a=matrix[i],b=matrix[4+i],c=matrix[8+i];
+        if(Math.abs(a*x+b*y+c*z+matrix[12+i])>1+Math.abs(a)*rx+Math.abs(b)*ry+Math.abs(c)*rz)return false;
+      }
+      return true;
+    }
+    const streetVisible=inFrame(-3.94,.83,1.68,2.18,.83,.36);
+    const benchClose=height/view.extent>95&&inFrame(-1.78,.86,6.88,.73,.62,.43);
+    const walker=afternoonPose(reduced.matches?0:time);
+    const reading=benchClose&&!reduced.matches?pulse((time+2.4)%9,2.6):0;
     const angle=reduced.matches&&Number.isFinite(wheelStart)?wheelBase+wheelTravel:currentWheel(now);
-    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,bird,birdAge,
+    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,bird,birdAge,walker,reading,
       pageTurn:pageOpen?turn:1-turn,water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
       rainTime:time,rainAmount:rain});
     if(!canvas.dataset.ready){canvas.dataset.ready='true';document.querySelector('.poster')?.remove();}
     if(animating){
       if(mobile||economy)timer=setTimeout(request,Math.max(0,1000/30-(performance.now()-now)-7));
       else request();
+    }else if(!reduced.matches&&(streetVisible||benchClose)){
+      timer=setTimeout(request,streetVisible||reading>0?(mobile?65:45):250);
     }else if(!reduced.matches){
       // Sleep until the next breeze or passing shower.
       timer=setTimeout(request,Math.max(24,1000*Math.min(27-windPhase,57-rainPhase)+12));

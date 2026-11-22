@@ -4,7 +4,7 @@ function buildDistrictRainShelter(batches,leanX,leanZ){
   const scale=6,cells=175,rows=163,heights=new Float32Array(cells*rows);
   heights.fill(-.92);
   for(const batch of batches){
-    if(['sparrow','nearWing','farWing'].includes(batch.motion))continue;
+    if(batch.id===41||['sparrow','nearWing','farWing'].includes(batch.motion))continue;
     if(batch.motion==='drops'||batch.motion==='can'||batch.motion==='wheel'||batch.motion==='cloth')continue;
     const v=batch.data;
     for(let i=0;i<batch.used;i+=33){

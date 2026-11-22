@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / 'src'
-MODULES = ('weather', 'engine', 'ground', 'buildings', 'courtyard', 'riverside', 'audio', 'gestures', 'district')
+MODULES = ('weather', 'engine', 'ground', 'buildings', 'courtyard', 'riverside', 'afternoon', 'audio', 'gestures', 'district')
 
 
 def build():

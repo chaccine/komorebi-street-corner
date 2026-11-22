@@ -157,6 +157,8 @@ function createDistrictRenderer(canvas,geometry){
   uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water,pageTurn;
   uniform vec3 birdOffset;
   uniform float birdYaw,wingFold;
+  uniform vec4 walker;
+  uniform float reading;
   out vec3 normal,color,world,sun;out vec2 uv;
   void main(){
     vec3 p=pos,n=norm;
@@ -210,6 +212,31 @@ function createDistrictRenderer(canvas,geometry){
       }
       mat2 turn=mat2(cos(birdYaw),sin(birdYaw),-sin(birdYaw),cos(birdYaw));
       p.xz=turn*p.xz;n.xz=turn*n.xz;p+=birdOffset;
+    }
+    if(movement>=13&&movement<=18){
+      float stride=fract(walker.z+(movement==15||movement==17?.5:0.));
+      if(movement==14||movement==15){
+        float h=1.-smoothstep(.15,.72,p.y);
+        // The supporting foot moves back exactly as far as the body advances.
+        float reach=stride<.5?.25-stride:-.25+smoothstep(.5,1.,stride)*.5;
+        p.z+=.63*reach*h*walker.w;
+        p.y+=.098*sin(clamp(2.*stride-1.,0.,1.)*3.14159)*h*walker.w;
+      }
+      if(movement==16||movement==17){
+        float a=-.21*cos(stride*6.283185)*walker.w;
+        mat2 rot=mat2(cos(a),sin(a),-sin(a),cos(a));
+        vec2 pivot=vec2(1.15,0.);
+        p.yz=pivot+rot*(p.yz-pivot);n.yz=rot*n.yz;
+      }
+      if(movement!=18)p.y+=.018*walker.w*pow(sin(walker.z*6.283185),2.)*smoothstep(.10,.68,p.y);
+      mat2 turn=mat2(cos(walker.y),sin(walker.y),-sin(walker.y),cos(walker.y));
+      p.xz=turn*p.xz+vec2(walker.x,1.68);n.xz=turn*n.xz;
+    }
+    if(movement==19||movement==20){
+      float a=(movement==19?.22:.033)*reading;
+      mat2 turn=mat2(cos(a),sin(a),-sin(a),cos(a));
+      if(movement==19){vec2 pivot=vec2(-1.552,.995);p.xy=pivot+turn*(p.xy-pivot);n.xy=turn*n.xy;}
+      else{vec2 pivot=vec2(.745,6.858);p.yz=pivot+turn*(p.yz-pivot);n.yz=turn*n.yz;}
     }
     world=p;normal=n;color=paint;uv=st;
     sun=(solar*vec4(p,1.)).xyz*.5+.5;gl_Position=view*vec4(p,1.);
@@ -330,7 +357,7 @@ function createDistrictRenderer(canvas,geometry){
       const loc={pr};for(const name of names.split(' '))loc[name]=gl.getUniformLocation(pr,name);
       return loc;
     }
-    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn birdOffset birdYaw wingFold atlas';
+    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn birdOffset birdYaw wingFold walker reading atlas';
     const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover birdAge');
     const shadow=makeProgram(vertex,shadowFragment,motionUniforms);
     const screen=makeProgram(screenVS,screenFS,'image depthMap stroke');
@@ -386,7 +413,7 @@ function createDistrictRenderer(canvas,geometry){
         buffers.set(g,vao);deletes.push(()=>{gl.deleteVertexArray(vao);gl.deleteBuffer(buf);});
       }
       gl.bindVertexArray(buffers.get(g));
-      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8,sparrow:9,nearWing:10,farWing:11,basinWater:12}[g.motion]||0);
+      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8,sparrow:9,nearWing:10,farWing:11,basinWater:12,walker:13,leftStep:14,rightStep:15,leftSwing:16,rightSwing:17,footShadow:18,pointing:19,lapPaper:20}[g.motion]||0);
       if(g.motion==='cloth'){
         gl.uniform1f(loc.clothTop,g.hi[1]);gl.uniform1f(loc.clothHeight,g.hi[1]-g.lo[1]);
       }
@@ -401,6 +428,7 @@ function createDistrictRenderer(canvas,geometry){
       gl.uniform1f(loc.pageTurn,state.pageTurn||0);
       gl.uniform3fv(loc.birdOffset,state.bird.offset);
       gl.uniform1f(loc.birdYaw,state.bird.yaw);gl.uniform1f(loc.wingFold,state.bird.wing);
+      gl.uniform4fv(loc.walker,state.walker);gl.uniform1f(loc.reading,state.reading);
       if(loc.birdAge)gl.uniform1f(loc.birdAge,state.birdAge);
       gl.uniform1f(loc.clothAmplitude,state.clothAmplitude??1);
       bind(0,atlas);gl.uniform1i(loc.atlas,0);
@@ -437,7 +465,7 @@ function createDistrictRenderer(canvas,geometry){
         shadowPage=state.pageTurn;shadowWater=state.water;shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
         gl.bindFramebuffer(gl.FRAMEBUFFER,sunTarget);gl.viewport(0,0,shadowSize,shadowSize);
         gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1.35,2.0);
-        shared(shadow,solar,state);for(const b of visible)if(b.motion!=='glass'&&b.motion!=='drops')drawBatch(b,shadow);
+        shared(shadow,solar,state);for(const b of visible)if(b.motion!=='glass'&&b.motion!=='drops'&&b.id!==41)drawBatch(b,shadow);
         gl.disable(gl.POLYGON_OFFSET_FILL);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.viewport(0,0,w,h);
@@ -475,7 +503,7 @@ function createDistrictRenderer(canvas,geometry){
       let result=direct,nearest=r*r;
       for(let j=0;j<ph;j++)for(let i=0;i<pw;i++){
         const id=hitBytes[4*(j*pw+i)+3];
-        if(!id||(direct>0&&id!==focus+10))continue;
+        if(!id||id>=40||(direct>0&&id!==focus+10))continue;
         const d=(l+i-cx)**2+(bottom+j-cy)**2;
         if(d<nearest){nearest=d;result=id;}
       }

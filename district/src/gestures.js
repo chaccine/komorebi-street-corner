@@ -148,7 +148,7 @@ function attachDistrictGestures(canvas, {pick, activate, orbit, pan, zoom, reset
         const hit = distance(p,state.start) <= 1 ? state.hit : pick(p.x,p.y,state.type);
         if (hit === state.hit) {
           if (hit > 0) activate(hit,state.type);
-          else lastBlankTap = {point:p,type:state.type,time:e.timeStamp};
+          else if(hit===0)lastBlankTap = {point:p,type:state.type,time:e.timeStamp};
         }
       }
     }
