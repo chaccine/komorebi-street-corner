@@ -1953,7 +1953,8 @@ async function startDistrict(){
     const cloth=reduced.matches?0:Math.max(natural,pulse(windAge,2.7));
     const rainPhase=(time+32)%57,rain=reduced.matches?0:pulse(rainPhase,11);
     const spinning=now-wheelStart<wheelDuration*1000;
-    const age=(now-waterStart)/1000, watering=age>=0&&age<2.45;
+    // An input can arrive after the timestamp of the first requested frame.
+    const age=Math.max(0,(now-waterStart)/1000), watering=age<2.45;
     const animating=watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
     const period=now-lastTimedFrame;
     if(lastTimedFrame&&period>52&&period<3000){if(++slowFrames>=5)economyUntil=now+4500;}
