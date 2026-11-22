@@ -2,7 +2,8 @@ const districtPlaces=[
   {id:1,slug:'tea',name:'晴间茶铺',center:[-4.65,1.90,.04],width:4.65,height:4.30,yaw:.15,feature:[-4.65,2.97,.67]},
   {id:2,slug:'cycles',name:'自行车修理棚',center:[.32,1.37,-.64],width:3.75,height:3.0,yaw:.16,feature:[.45,1.98,-.28]},
   {id:3,slug:'flats',name:'外廊公寓',center:[4.90,2.65,-.44],width:3.95,height:5.65,yaw:.29,feature:[5.35,4.45,.28]},
-  {id:4,slug:'florist',name:'巷尾花店',center:[-1.4,1.42,-12.18],width:5.75,height:3.65,yaw:-.23,feature:[-.22,1.06,-10.75]}
+  {id:4,slug:'florist',name:'巷尾花店',center:[-1.4,1.42,-12.18],width:5.75,height:3.65,yaw:-.23,feature:[-.22,1.06,-10.75]},
+  {id:5,slug:'newsstand',name:'旧书报亭',center:[1.17,.99,7.20],width:2.85,height:2.44,yaw:-.36,feature:[.92,1.03,7.68]}
 ];
 
 async function startDistrict(){
@@ -24,6 +25,7 @@ async function startDistrict(){
   let width=0,height=0,view=null,lastMatrix=null,lastEye=null;
   let wheelStart=-Infinity,wheelBase=0,clothStart=-Infinity;
   let waterStart=-Infinity;
+  let pageStart=-Infinity,pageOpen=false;
   let lightStart=-Infinity,lightFrom=0,lightTo=0;
   function axes(yaw,tilt){
     const x=Math.sin(yaw),z=Math.cos(yaw),s=Math.sin(tilt),c=Math.cos(tilt);
@@ -39,7 +41,7 @@ async function startDistrict(){
     const aspect=width/Math.max(1,height),portrait=aspect<.84;
     if(id){
       const b=districtPlaces[id-1];
-      return {center:b.center.slice(),yaw:b.yaw,tilt:id===4?.51:.31,
+      return {center:b.center.slice(),yaw:b.yaw,tilt:id===5?.46:id===4?.51:.31,
         extent:Math.max(b.height*.61,b.width*.60/aspect)};
     }
     const yaw=portrait?-.48:.48,tilt=portrait?.67:.62,[r,u]=axes(yaw,tilt);
@@ -101,6 +103,12 @@ async function startDistrict(){
     }else if(id===4){
       if(now-waterStart<2450)return;
       waterStart=now;audio.play('water',b.feature);status.textContent='水壶倾向花槽，水滴落进泥土，花叶轻轻晃动。';
+    }else if(id===5){
+      if(now-pageStart<950)return;
+      pageOpen=!pageOpen;
+      pageStart=now;
+      audio.play('paper',b.feature);
+      status.textContent=pageOpen?'报纸翻开，露出夕阳下的巷尾花店插画。':'报纸翻回了头版。';
     }
     request();
   }
@@ -154,7 +162,7 @@ async function startDistrict(){
   function keyAction(key){
     if(key==='m'){status.textContent=audio.toggle()?'已静音。':'声音已打开。';return;}
     if(key==='home'||key==='escape'){travel(0);return;}
-    if(['1','2','3','4'].includes(key)){travel(Number(key));return;}
+    if(['1','2','3','4','5'].includes(key)){travel(Number(key));return;}
     if((key==='enter'||key===' ')&&focus)interact(focus);
   }
   function request(){
@@ -179,7 +187,8 @@ async function startDistrict(){
     const spinning=now-wheelStart<wheelDuration*1000;
     // An input can arrive after the timestamp of the first requested frame.
     const age=Math.max(0,(now-waterStart)/1000), watering=age<2.45;
-    const animating=watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
+    const turn=reduced.matches?1:smooth(clamp((now-pageStart)/950,0,1));
+    const animating=turn<1||watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
     const period=now-lastTimedFrame;
     if(lastTimedFrame&&period>52&&period<3000){if(++slowFrames>=5)economyUntil=now+4500;}
     else slowFrames=0;
@@ -192,7 +201,7 @@ async function startDistrict(){
     const {matrix,eye}=matrixOf(view);lastMatrix=matrix;lastEye=eye;audio.setView(matrix);
     const angle=reduced.matches&&Number.isFinite(wheelStart)?wheelBase+wheelTravel:currentWheel(now);
     scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,
-      water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
+      pageTurn:pageOpen?turn:1-turn,water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
       rainTime:time,rainAmount:rain});
     if(!canvas.dataset.ready){canvas.dataset.ready='true';document.querySelector('.poster')?.remove();}
     if(animating){

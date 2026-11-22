@@ -415,5 +415,79 @@ function buildDistrictBuildings(g) {
     g.group(4,false,'drops');
     for(let j=0;j<24;j++)b.ball(j,0,0,.016,.036,.016,'#9cdad4',6,3);
   }
-  teaShop();bicycleShed();apartment();florist();g.group(0);
+  function newsstand(){
+    const b=workshop(1.22,7.13),wood='#967657',cream='#eadbb9',red='#985e51';
+    g.group(5);
+    b.box(0,.03,.04,2.30,.11,1.30,'#aea990');
+    b.box(.05,.53,-.03,1.95,.97,.89,wood);
+    b.box(0,.99,-.14,2.22,.09,.63,'#775e4a');
+    b.box(.09,1.42,-.43,1.9,.82,.085,'#5c716b');
+    for(const x of [-.94,.98])b.box(x,1.44,-.08,.086,.91,.76,wood);
+    b.box(.03,1.97,-.11,2.28,.15,.89,red);
+    for(const x of [-.84,-.28,.28,.84])b.box(x,2.049,-.11,.017,.013,.875,'#aa705e');
+    b.box(.03,1.88,.32,2.28,.055,.075,'#d2ad77');
+    b.box(0,1.75,.28,1.51,.24,.06,cream);
+    b.sign('晴 間 書 報',0,1.75,.316,1.39,.17,'#764d41',cream);
+    b.box(0,.925,.54,1.98,.09,.57,'#b99571');
+    for(const x of [-.83,.82])b.line([[x,.63,.32],[x,.88,.75]],.031,'#657568');
+    // Sun-faded weeklies sit behind a brass retaining rail.
+    const covers=['#ac6d61','#647f80','#c49e61','#858ca1','#9baf87','#ce9178'];
+    for(let j=0;j<6;j++){
+      const x=-.76+j*.287,y=1.24+(j%3)*.027;
+      b.box(x,y,-.29,.247,.37,.07,covers[j]);
+      b.box(x,y+.125,-.25,.199,.033,.008,cream);
+      if(j%2===0)b.ball(x-.025,y-.016,-.248,.058,.060,.009,'#e1ce9b',9,3);
+      else b.face([[x-.09,y-.063,-.245],[x+.082,y-.063,-.245],[x+.025,y+.055,-.245]],'#d9cab0');
+      for(let k=0;k<2;k++)b.box(x-.017,y-.097-k*.024,-.247,.144-k*.030,.008,.008,cream);
+    }
+    b.rod([-.93,1.13,-.218],[.91,1.13,-.218],.018,'#b9a272');
+    for(let i=0;i<8;i++){
+      b.box(-.87+i*.24,.45,.423,.21,.76,.035,i%2?'#ac8b68':'#a28362');
+    }
+    for(const x of [-.98,.99])b.box(x,.53,.435,.043,.85,.042,'#72796c');
+    b.box(.04,.48,.456,.75,.28,.021,'#cfbc97');
+    b.sign('日刊 · 雑誌',.04,.48,.473,.65,.17,'#5f6456','#e4d2aa');
+    for(let i=0;i<4;i++)b.box(.743,1.001+i*.021,.52,.34,.02,.38,i%2?cream:'#aba18d');
+    b.box(.743,1.08,.52,.34,.017,.38,'#8c9b87');
+    for(let i=0;i<4;i++)b.box(.727,1.09,.43+i*.029,.23-i*.031,.005,.011,cream);
+
+    // The inset is a two-colour street print: the florist's roof, hillside and evening sun.
+    g.group(15);
+    b.box(-.30,.990,.55,1.35,.045,.51,cream);
+    const spine=-.30,half=.655,back=.31,front=.79;
+    function printShape(points,y,color){
+      b.face(points.map(([x,z])=>[spine+x,y,z]),color);
+    }
+    let foldedSheet=false;
+    function strip(x,z,w,d,y,c){
+      const parts=foldedSheet?Math.ceil(w/(half/16)):1;
+      for(let i=0;i<parts;i++){
+        const a=x+w*i/parts,bx=x+w*(i+1)/parts;
+        printShape([[a,z],[bx,z],[bx,z+d],[a,z+d]],y,c);
+      }
+    }
+    const ink='#4e5d56';
+    strip(.024,.328,.601,.438,1.015,'#c2d3c1');
+    printShape(Array.from({length:20},(_,i)=>[.464+.067*Math.cos(i*tau/20),.428+.067*Math.sin(i*tau/20)]),1.016,'#c5815e');
+    printShape([[.024,.54],[.14,.45],[.26,.55],[.39,.478],[.625,.56],[.625,.67],[.024,.67]],1.017,'#819a86');
+    strip(.024,.59,.601,.176,1.018,'#8caeb0');
+    strip(.09,.553,.219,.135,1.019,'#eee0ba');
+    printShape([[.067,.562],[.141,.479],[.283,.479],[.337,.562]],1.020,'#526d68');
+    for(let i=0;i<3;i++)strip(.113+i*.061,.585,.039,.063,1.021,'#819d93');
+    for(let i=0;i<4;i++)strip(.36+i*.046,.636+(i%2)*.057,.057,.007,1.020,'#dcd8b6');
+    strip(-.62,.343,.48,.035,1.015,ink);
+    for(let j=0;j<11;j++)for(let k=0;k<2;k++)strip(-.62+k*.297,.417+j*.030,.239-(j%3)*.016,.008,1.015,'#929081');
+    // Short strips share the same bend as their ink and keep the binding fixed.
+    g.group(15,false,'page');
+    foldedSheet=true;
+    for(let i=0;i<16;i++)strip(i*half/16,back,half/16,front-back,1.029,'#f1e6ca');
+    strip(.035,.345,.55,.044,1.031,'#514e45');
+    strip(.04,.402,.54,.008,1.031,'#a26a50');
+    for(let j=0;j<11;j++)for(let k=0;k<3;k++)strip(.04+k*.19,.435+j*.029,.152-(j%4)*.009,.006,1.031,'#79796b');
+    // Ink on the reverse becomes visible when the page rests on the left.
+    strip(.057,.349,.525,.022,1.027,'#8a6b5b');
+    for(let j=0;j<9;j++)for(let k=0;k<2;k++)strip(.058+k*.278,.409+j*.037,.229-(j%3)*.012,.009,1.027,'#969184');
+    g.group(5);
+  }
+  teaShop();bicycleShed();apartment();florist();newsstand();g.group(0);
 }

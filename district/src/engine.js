@@ -154,7 +154,7 @@ function createDistrictRenderer(canvas,geometry){
   layout(location=0)in vec3 pos;layout(location=1)in vec3 norm;
   layout(location=2)in vec3 paint;layout(location=3)in vec2 st;
   uniform mat4 view,solar;uniform int movement;
-  uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water;
+  uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water,pageTurn;
   out vec3 normal,color,world,sun;out vec2 uv;
   void main(){
     vec3 p=pos,n=norm;
@@ -191,6 +191,13 @@ function createDistrictRenderer(canvas,geometry){
     if(movement==6 && water>.48){
       float h=max(0.,p.y-.57);
       p.x+=h*.13*sin(21.*water+pos.z*9.)*smoothstep(.48,.69,water)*(1.-smoothstep(1.85,2.45,water));
+    }
+    if(movement==8){
+      float dist=p.x-.92, arch=sin(pageTurn*3.14159265);
+      float theta=pageTurn*3.14159265+arch*(.49*dist/.655+.22*(p.z-7.68));
+      mat2 fold=mat2(cos(theta),sin(theta),-sin(theta),cos(theta));
+      p.xy=vec2(.92,1.029)+fold*vec2(dist,p.y-1.029);
+      n.xy=fold*n.xy;
     }
     world=p;normal=n;color=paint;uv=st;
     sun=(solar*vec4(p,1.)).xyz*.5+.5;gl_Position=view*vec4(p,1.);
@@ -287,7 +294,7 @@ function createDistrictRenderer(canvas,geometry){
       const loc={pr};for(const name of names.split(' '))loc[name]=gl.getUniformLocation(pr,name);
       return loc;
     }
-    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water atlas';
+    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn atlas';
     const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover');
     const shadow=makeProgram(vertex,shadowFragment,motionUniforms);
     const screen=makeProgram(screenVS,screenFS,'image depthMap stroke');
@@ -319,7 +326,7 @@ function createDistrictRenderer(canvas,geometry){
     gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
     function check(){if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Incomplete WebGL drawing target');}
     check();
-    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowWater=0,shadowCloth=0,shadowTime=-Infinity;
+    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowWater=0,shadowPage=0,shadowCloth=0,shadowTime=-Infinity;
     function bind(unit,t){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);}
     function resize(state,rect){
       const q=Math.min(state.quality||1,maxEdge/Math.max(rect.width,rect.height,1));
@@ -343,7 +350,7 @@ function createDistrictRenderer(canvas,geometry){
         buffers.set(g,vao);deletes.push(()=>{gl.deleteVertexArray(vao);gl.deleteBuffer(buf);});
       }
       gl.bindVertexArray(buffers.get(g));
-      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7}[g.motion]||0);
+      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8}[g.motion]||0);
       if(g.motion==='cloth'){
         gl.uniform1f(loc.clothTop,g.hi[1]);gl.uniform1f(loc.clothHeight,g.hi[1]-g.lo[1]);
       }
@@ -355,6 +362,7 @@ function createDistrictRenderer(canvas,geometry){
       gl.uniformMatrix4fv(loc.solar,false,solar);
       gl.uniform1f(loc.angle,state.wheelAngle||0);gl.uniform1f(loc.cloth,state.clothTime||0);
       gl.uniform1f(loc.water,state.water||0);
+      gl.uniform1f(loc.pageTurn,state.pageTurn||0);
       gl.uniform1f(loc.clothAmplitude,state.clothAmplitude??1);
       bind(0,atlas);gl.uniform1i(loc.atlas,0);
     }
@@ -380,10 +388,11 @@ function createDistrictRenderer(canvas,geometry){
       const visible=batches.filter(g=>visibleDetail(g,state,pixels));
       const lod=visible.map(g=>g.id+'/'+g.nearOnly+'/'+g.motion).join(',');
       const angle=state.wheelAngle||0,cloth=state.clothTime||0,now=performance.now();
-      const changed=angle!==shadowAngle||cloth!==shadowCloth||state.water!==shadowWater;
+      const pageChanged=state.pageTurn!==shadowPage;
+      const changed=angle!==shadowAngle||cloth!==shadowCloth||state.water!==shadowWater||pageChanged;
       gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.DITHER);
-      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0||!state.water&&shadowWater>0))){
-        shadowWater=state.water;shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
+      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0||!state.water&&shadowWater>0||pageChanged&&(state.pageTurn===0||state.pageTurn===1)))){
+        shadowPage=state.pageTurn;shadowWater=state.water;shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
         gl.bindFramebuffer(gl.FRAMEBUFFER,sunTarget);gl.viewport(0,0,shadowSize,shadowSize);
         gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1.35,2.0);
         shared(shadow,solar,state);for(const b of visible)if(b.motion!=='glass'&&b.motion!=='drops')drawBatch(b,shadow);

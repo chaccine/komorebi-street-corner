@@ -1,6 +1,6 @@
 # 晴间街区
 
-一座可以拿近细看的日式微缩街区。四栋建筑沿街道与小巷相连，斑马线边有树荫和长椅，转动底座还能看见断开的混凝土、钢筋和垂下的树根。[进入街区](https://chaccine.github.io/komorebi-street-corner/district/)
+一座可以拿近细看的日式微缩街区。五栋建筑沿街道与小巷相连，斑马线边有树荫和长椅，转动底座还能看见断开的混凝土、钢筋和垂下的树根。[进入街区](https://chaccine.github.io/komorebi-street-corner/district/)
 
 | 建筑 | 可以做什么 |
 | --- | --- |
@@ -8,14 +8,15 @@
 | [自行车修理棚](https://chaccine.github.io/komorebi-street-corner/district/#cycles) | 拨一下悬挂的车轮，看反光片绕圈，听棘轮声逐渐变慢。 |
 | [外廊公寓](https://chaccine.github.io/komorebi-street-corner/district/#flats) | 点阳台的床单，风会掀起下摆，露出后面的盆栽。 |
 | [巷尾花店](https://chaccine.github.io/komorebi-street-corner/district/#florist) | 顺着修理棚旁的石板巷到玻璃花房，点门边的青绿水壶浇花。 |
+| [旧书报亭](https://chaccine.github.io/komorebi-street-corner/district/#newsstand) | 点长椅旁摊开的报纸，听纸页翻动，露出夕阳下的巷尾花店插画。再点一次翻回头版。 |
 
 ## 怎么逛
 
-电脑上拖动旋转，滚轮缩放，右键拖动或按住 Shift 拖动可以平移。点建筑可以靠近，也可以直接点全景里的窗户、车轮、床单和花店水壶。
+电脑上拖动旋转，滚轮缩放，右键拖动或按住 Shift 拖动可以平移。点建筑可以靠近，也可以直接点全景里的窗户、车轮、床单、花店水壶和报纸。
 
 手机竖屏会从茶铺一侧望向街区。单指拖动旋转，双指捏合缩放，双指同向移动可以平移。先点建筑靠近，再点细节互动。两指同时轻点可切换静音。横竖屏切换时会重新取景，保留正在看的建筑。
 
-双击空白处回到全景。键盘可用 1、2、3、4 选建筑，用回车或空格互动，Home 或 Esc 返回，M 切换静音。声音在首次操作后启用。
+双击空白处回到全景。键盘可用 1、2、3、4、5 选建筑，用回车或空格互动，Home 或 Esc 返回，M 切换静音。声音在首次操作后启用。
 
 ## 本地运行
 
@@ -36,4 +37,4 @@ python -B build.py
 
 ## 检查改动
 
-安装 Python 的 Playwright 包与 Chromium 后，运行 `python -B checks/check_district.py`。测试会在浏览器中实际点选四栋建筑，检查灯光、车轮、床单和直达链接，再用三倍像素密度的触屏模拟检查捏合、点按和返回。可用 `--chrome` 指定浏览器路径，或传入试玩网址来检查已发布版本。
+安装 Python 的 Playwright 包与 Chromium 后，运行 `python -B checks/check_district.py`。测试会在浏览器中实际点选五栋建筑，检查灯光、车轮、床单、浇水、翻页、纸声和直达链接，再用三倍像素密度的触屏模拟检查捏合、点按和返回。可用 `--chrome` 指定浏览器路径，或传入试玩网址来检查已发布版本。

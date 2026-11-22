@@ -17,6 +17,12 @@ PROBE = r"""
   const api=window.WebGL2RenderingContext?.prototype;
   if(!api)return;
   const q=window.districtCheck={history:[],last:null};
+  q.paperSounds=0;
+  const startSource=AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start=function(...args){
+    if(this.buffer && Math.abs(this.buffer.duration-.93)<.001 && this.buffer.getChannelData(0).some(x=>Math.abs(x)>.02))q.paperSounds++;
+    return startSource.apply(this,args);
+  };
   const locations=new WeakMap(),programs=new WeakMap();
   let gl,prog,target,scene,sceneTarget;
   function wrap(name,record){
@@ -45,7 +51,7 @@ PROBE = r"""
     if(!state?.post||!sceneTarget)return;
     const s=programs.get(scene);
     q.last={view:s.view,scale:Math.hypot(s.view[0],s.view[4],s.view[8]),
-      water:s.water,lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
+      pageTurn:s.pageTurn,water:s.water,lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
       time:performance.now(),size:[this.drawingBufferWidth,this.drawingBufferHeight]};
     q.history.push(q.last);if(q.history.length>550)q.history.shift();
   });
@@ -61,6 +67,18 @@ PROBE = r"""
     const data=image(),counts={};
     for(let i=3;i<data.length;i+=4)counts[data[i]]=(counts[data[i]]||0)+1;
     return counts;
+  };
+  q.blankPoint=function(){
+    const data=image(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight;
+    const radius=Math.ceil(10*w/innerWidth);
+    for(let y=radius;y<h-radius;y+=radius*2)for(let x=radius;x<w-radius;x+=radius*2){
+      let clear=true;
+      for(let dy=-radius;dy<=radius&&clear;dy++)for(let dx=-radius;dx<=radius;dx++){
+        if(data[((y+dy)*w+x+dx)*4+3]){clear=false;break;}
+      }
+      if(clear)return {x:(x+.5)*innerWidth/w,y:(h-y-.5)*innerHeight/h,id:1};
+    }
+    throw Error('No empty touch target in this view');
   };
   q.object=function(id){
     const data=image(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight;
@@ -148,7 +166,7 @@ def desktop(browser, url, captures, width, height):
         ready(page,url)
         resting_camera(page)
         counts=page.evaluate('districtCheck.objects()')
-        assert all(counts.get(str(k),0)>24 for k in (1,2,3,4,11,12,13)),counts
+        assert all(counts.get(str(k),0)>24 for k in (1,2,3,4,5,11,12,13,15)),counts
         screenshot(page,captures,'desktop-district')
         overview=page.evaluate('districtCheck.last.scale')
         original=page.evaluate('districtCheck.last.view')
@@ -165,7 +183,7 @@ def desktop(browser, url, captures, width, height):
         wait(page,f"districtCheck.last.scale>{overview*1.17}")
         page.keyboard.press('Home')
         resting_camera(page)
-        for building,route in enumerate(('tea','cycles','flats','florist'),1):
+        for building,route in enumerate(('tea','cycles','flats','florist','newsstand'),1):
             select(page,building)
             expect_hash(page,'#'+route)
             close=page.evaluate('districtCheck.last.scale')
@@ -180,6 +198,9 @@ def desktop(browser, url, captures, width, height):
                 wait(page,f"Math.abs(districtCheck.last.lamp-{before['lamp']})>.6")
             elif route=='cycles':
                 wait(page,f"Math.abs(districtCheck.last.angle-{before['angle']})>.55")
+            elif route=='newsstand':
+                wait(page,'districtCheck.last.pageTurn===1 && districtCheck.paperSounds===1')
+                screenshot(page,captures,'newsstand-open')
             elif route=='florist':
                 wait(page,'districtCheck.last.water>.50')
             else:
@@ -191,7 +212,7 @@ def desktop(browser, url, captures, width, height):
             page.keyboard.press('Home')
             expect_hash(page,'')
             assert abs(page.evaluate('districtCheck.last.scale')-overview)<.002
-        for index,route in enumerate(('tea','cycles','flats','florist'),1):
+        for index,route in enumerate(('tea','cycles','flats','florist','newsstand'),1):
             page.goto('about:blank')
             ready(page,url+'#'+route)
             expect_hash(page,'#'+route)
@@ -199,7 +220,7 @@ def desktop(browser, url, captures, width, height):
             assert page.evaluate('id=>districtCheck.object(id).n',index+10)>80
         assert not failures,failures
         assert page.evaluate('districtCheck.glError()')==0
-        print('Desktop: four buildings, drag/zoom, four focus routes, lamp/rim/cloth pixels, Home and fresh deep links passed',flush=True)
+        print('Desktop: five buildings, drag/zoom, five focus routes, lamp/rim/cloth pixels, Home and fresh deep links passed',flush=True)
     finally:
         ctx.close()
 
@@ -242,8 +263,7 @@ def mobile(browser, url, captures):
         screenshot(page,captures,'mobile-cycles')
         # Preserve a human double-tap cadence even if software WebGL blocks
         # the browser's main thread between native events.
-        viewport=page.viewport_size
-        blank={'x':viewport['width']*.50,'y':viewport['height']*.82,'id':1}
+        blank=page.evaluate('districtCheck.blankPoint()')
         touched=time()
         for offset,pressed in ((0,True),(.035,False),(.145,True),(.18,False)):
             device.send('Input.dispatchTouchEvent',{
@@ -267,6 +287,28 @@ def mobile(browser, url, captures):
         wait(page,'districtCheck.last.water>.50')
         assert not failures,failures
         assert page.evaluate('districtCheck.glError()')==0
+        page.set_viewport_size({'width':390,'height':844})
+        page.keyboard.press('Home')
+        expect_hash(page,'')
+        for x in [-2.54,-1.76,-.91]:
+            bx,by=page.evaluate('x=>{const m=districtCheck.last.view,y=.49,z=7.03;return [(1+m[0]*x+m[4]*y+m[8]*z+m[12])*innerWidth/2,(1-m[1]*x-m[5]*y-m[9]*z-m[13])*innerHeight/2]}',x)
+            page.touchscreen.tap(bx,by)
+            assert page.evaluate("location.hash==='' && districtCheck.paperSounds===0")
+        select(page,15,touch=True)
+        expect_hash(page,'#newsstand')
+        assert page.evaluate('districtCheck.last.pageTurn===0 && districtCheck.paperSounds===0')
+        select(page,15,touch=True)
+        wait(page,'districtCheck.last.pageTurn===1 && districtCheck.paperSounds===1')
+        screenshot(page,captures,'mobile-newsstand-open')
+        page.set_viewport_size({'width':844,'height':390})
+        resting_camera(page)
+        page.keyboard.press('m')
+        select(page,15,touch=True)
+        wait(page,'districtCheck.last.pageTurn===0')
+        assert page.evaluate('districtCheck.paperSounds===1')
+        assert not failures,failures
+        assert page.evaluate('districtCheck.glError()')==0
+        print('Mobile newsstand: bench, focus, page turning, landscape, paper sound and mute passed')
         print('Mobile florist: portrait and landscape taps passed')
         print('Mobile: native 1170x2532, real two-finger pinch, no false tap, two-step wheel action and double-tap overview passed',flush=True)
     finally:

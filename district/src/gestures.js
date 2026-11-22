@@ -179,26 +179,26 @@ function attachDistrictGestures(canvas, {pick, activate, orbit, pan, zoom, reset
   canvas.style.touchAction = 'none';
   canvas.style.cursor = 'grab';
   canvas.setAttribute('aria-keyshortcuts',
-    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Plus - Home Escape 1 2 3 4 Enter Space M');
+    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Plus - Home Escape 1 2 3 4 5 Enter Space M');
   const arrows = {ArrowLeft:[-30,0],ArrowRight:[30,0],ArrowUp:[0,-30],ArrowDown:[0,30]};
   listen(win,'keydown',e=>{
     if((e.target!==win.document.body&&e.target!==win.document.documentElement)||
       e.defaultPrevented||e.isComposing||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
     const key=e.key.toLowerCase();
-    if(!['m','1','2','3','4','enter',' ','home','escape'].includes(key))return;
+    if(!['m','1','2','3','4','5','enter',' ','home','escape'].includes(key))return;
     if(e.isTrusted)unlockSound();
     canvas.focus({preventScroll:true});keyAction(key);e.preventDefault();
   });
   listen(canvas,'keydown',e => {
     if (e.target !== canvas || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
     const key=e.key.toLowerCase();
-    if(e.isTrusted && (Object.hasOwn(arrows,e.key)||['home','escape','+','=','-','1','2','3','4','enter',' ','m'].includes(key)))unlockSound();
+    if(e.isTrusted && (Object.hasOwn(arrows,e.key)||['home','escape','+','=','-','1','2','3','4','5','enter',' ','m'].includes(key)))unlockSound();
     if (Object.hasOwn(arrows,e.key)) {
       (e.shiftKey ? pan : orbit)(...arrows[e.key]);
     } else if (e.key === '+' || (!e.shiftKey && (e.key === '=' || e.key === '-'))) {
       const rect = canvas.getBoundingClientRect();
       zoom(e.key === '-' ? 1/1.15 : 1.15,{x:(rect.left+rect.right)/2,y:(rect.top+rect.bottom)/2});
-    } else if (!e.shiftKey && ['1','2','3','4','enter',' ','m','home','escape'].includes(key)) {
+    } else if (!e.shiftKey && ['1','2','3','4','5','enter',' ','m','home','escape'].includes(key)) {
       if (!e.repeat) keyAction(key);
     } else {
       return;
