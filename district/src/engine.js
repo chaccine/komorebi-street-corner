@@ -155,6 +155,8 @@ function createDistrictRenderer(canvas,geometry){
   layout(location=2)in vec3 paint;layout(location=3)in vec2 st;
   uniform mat4 view,solar;uniform int movement;
   uniform float angle,cloth,clothAmplitude,clothTop,clothHeight,water,pageTurn;
+  uniform vec3 birdOffset;
+  uniform float birdYaw,wingFold;
   out vec3 normal,color,world,sun;out vec2 uv;
   void main(){
     vec3 p=pos,n=norm;
@@ -199,6 +201,16 @@ function createDistrictRenderer(canvas,geometry){
       p.xy=vec2(.92,1.029)+fold*vec2(dist,p.y-1.029);
       n.xy=fold*n.xy;
     }
+    if(movement>=9&&movement<=11){
+      if(movement!=9){
+        float side=movement==10?1.:-1.,a=-wingFold*side;
+        vec2 hinge=vec2(.19,.071*side);
+        mat2 flap=mat2(cos(a),sin(a),-sin(a),cos(a));
+        p.yz=hinge+flap*(p.yz-hinge);n.yz=flap*n.yz;
+      }
+      mat2 turn=mat2(cos(birdYaw),sin(birdYaw),-sin(birdYaw),cos(birdYaw));
+      p.xz=turn*p.xz;n.xz=turn*n.xz;p+=birdOffset;
+    }
     world=p;normal=n;color=paint;uv=st;
     sun=(solar*vec4(p,1.)).xyz*.5+.5;gl_Position=view*vec4(p,1.);
     if(movement==5&&(water<.44||water>1.93))gl_Position=vec4(2.,2.,2.,1.);
@@ -208,6 +220,7 @@ function createDistrictRenderer(canvas,geometry){
   in vec3 normal,color,world,sun;in vec2 uv;
   uniform sampler2D atlas;uniform highp sampler2D shadows;
   uniform vec3 eye,light;uniform float lamp;uniform int id,movement,stage,hover;
+  uniform float birdAge;
   out vec4 outColor;
   float sunlight(vec3 n){
     if(any(lessThan(sun,vec3(0.)))||any(greaterThan(sun,vec3(1.))))return 1.;
@@ -245,6 +258,23 @@ function createDistrictRenderer(canvas,geometry){
       float stripe=fract((world.x+.42*world.z+.25*eye.x)*.39);
       float gleam=smoothstep(.54,.57,stripe)*(1.-smoothstep(.64,.66,stripe));
       lit=mix(vec3(.66,.85,.78),vec3(.96,.98,.86),.19+.53*gleam);
+    }
+    if(movement==12 && n.y>.7){
+      vec2 pool=world.xz-vec2(-.38,-7.16);
+      float shore=smoothstep(.22,.35,length(pool));
+      lit=mix(lit,vec3(.59,.69,.57),shore*.40);
+      float sky=dot(pool,vec2(.62,.78));
+      lit+=vec3(.028,.034,.030)*smoothstep(.03,.07,sky)*(1.-smoothstep(.08,.095,sky));
+      float d=length(world.xz-vec2(-.20,-7.02));
+      float t=birdAge>=4.25?birdAge-4.25:birdAge-.14;
+      float wave=0.;
+      for(int i=0;i<2;i++){
+        float age=t-.21*float(i);
+        float radius=age*.54;
+        float width=max(.012,fwidth(d));
+        wave+=step(0.,age)*(1.-smoothstep(.58,1.15,age))*(1.-smoothstep(width*.3,width*1.8,abs(d-radius)));
+      }
+      lit=mix(lit,vec3(.85,.91,.77),min(1.,wave)*.84);
     }
     if(id==hover&&hover>0)lit=mix(lit,vec3(1.,.92,.69),.105);
     outColor=vec4(clamp(lit,0.,1.),float(id)/255.);
@@ -294,8 +324,8 @@ function createDistrictRenderer(canvas,geometry){
       const loc={pr};for(const name of names.split(' '))loc[name]=gl.getUniformLocation(pr,name);
       return loc;
     }
-    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn atlas';
-    const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover');
+    const motionUniforms='view solar movement angle cloth clothAmplitude clothTop clothHeight water pageTurn birdOffset birdYaw wingFold atlas';
+    const scene=makeProgram(vertex,fragment,motionUniforms+' shadows eye light lamp id stage hover birdAge');
     const shadow=makeProgram(vertex,shadowFragment,motionUniforms);
     const screen=makeProgram(screenVS,screenFS,'image depthMap stroke');
     function texture(){
@@ -326,7 +356,7 @@ function createDistrictRenderer(canvas,geometry){
     gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
     function check(){if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Incomplete WebGL drawing target');}
     check();
-    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowWater=0,shadowPage=0,shadowCloth=0,shadowTime=-Infinity;
+    let w=0,h=0,shadowDetail='',shadowAngle=0,shadowWater=0,shadowPage=0,shadowCloth=0,shadowBird='',shadowTime=-Infinity;
     function bind(unit,t){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);}
     function resize(state,rect){
       const q=Math.min(state.quality||1,maxEdge/Math.max(rect.width,rect.height,1));
@@ -350,7 +380,7 @@ function createDistrictRenderer(canvas,geometry){
         buffers.set(g,vao);deletes.push(()=>{gl.deleteVertexArray(vao);gl.deleteBuffer(buf);});
       }
       gl.bindVertexArray(buffers.get(g));
-      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8}[g.motion]||0);
+      gl.uniform1i(loc.movement,{wheel:1,cloth:2,lamp:3,can:4,drops:5,wetLeaves:6,glass:7,page:8,sparrow:9,nearWing:10,farWing:11,basinWater:12}[g.motion]||0);
       if(g.motion==='cloth'){
         gl.uniform1f(loc.clothTop,g.hi[1]);gl.uniform1f(loc.clothHeight,g.hi[1]-g.lo[1]);
       }
@@ -363,6 +393,9 @@ function createDistrictRenderer(canvas,geometry){
       gl.uniform1f(loc.angle,state.wheelAngle||0);gl.uniform1f(loc.cloth,state.clothTime||0);
       gl.uniform1f(loc.water,state.water||0);
       gl.uniform1f(loc.pageTurn,state.pageTurn||0);
+      gl.uniform3fv(loc.birdOffset,state.bird.offset);
+      gl.uniform1f(loc.birdYaw,state.bird.yaw);gl.uniform1f(loc.wingFold,state.bird.wing);
+      if(loc.birdAge)gl.uniform1f(loc.birdAge,state.birdAge);
       gl.uniform1f(loc.clothAmplitude,state.clothAmplitude??1);
       bind(0,atlas);gl.uniform1i(loc.atlas,0);
     }
@@ -389,9 +422,12 @@ function createDistrictRenderer(canvas,geometry){
       const lod=visible.map(g=>g.id+'/'+g.nearOnly+'/'+g.motion).join(',');
       const angle=state.wheelAngle||0,cloth=state.clothTime||0,now=performance.now();
       const pageChanged=state.pageTurn!==shadowPage;
-      const changed=angle!==shadowAngle||cloth!==shadowCloth||state.water!==shadowWater||pageChanged;
+      const birdKey=state.bird.offset.join('/')+'/'+state.bird.yaw+'/'+state.bird.wing;
+      const birdChanged=birdKey!==shadowBird;
+      const changed=angle!==shadowAngle||cloth!==shadowCloth||state.water!==shadowWater||pageChanged||birdChanged;
       gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.DITHER);
-      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0||!state.water&&shadowWater>0||pageChanged&&(state.pageTurn===0||state.pageTurn===1)))){
+      if(lod!==shadowDetail||(changed&&(now-shadowTime>(state.economy?340:state.mobile?180:110)||cloth===0&&shadowCloth>0||!state.water&&shadowWater>0||birdChanged&&state.birdAge<0||pageChanged&&(state.pageTurn===0||state.pageTurn===1)))){
+        shadowBird=birdKey;
         shadowPage=state.pageTurn;shadowWater=state.water;shadowDetail=lod;shadowAngle=angle;shadowCloth=cloth;shadowTime=now;
         gl.bindFramebuffer(gl.FRAMEBUFFER,sunTarget);gl.viewport(0,0,shadowSize,shadowSize);
         gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1.35,2.0);

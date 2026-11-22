@@ -3,7 +3,8 @@ const districtPlaces=[
   {id:2,slug:'cycles',name:'自行车修理棚',center:[.32,1.37,-.64],width:3.75,height:3.0,yaw:.16,feature:[.45,1.98,-.28]},
   {id:3,slug:'flats',name:'外廊公寓',center:[4.90,2.65,-.44],width:3.95,height:5.65,yaw:.29,feature:[5.35,4.45,.28]},
   {id:4,slug:'florist',name:'巷尾花店',center:[-1.4,1.42,-12.18],width:5.75,height:3.65,yaw:-.23,feature:[-.22,1.06,-10.75]},
-  {id:5,slug:'newsstand',name:'旧书报亭',center:[1.17,.99,7.20],width:2.85,height:2.44,yaw:-.36,feature:[.92,1.03,7.68]}
+  {id:5,slug:'newsstand',name:'旧书报亭',center:[1.17,.99,7.20],width:2.85,height:2.44,yaw:-.36,feature:[.92,1.03,7.68]},
+  {id:6,slug:'courtyard',name:'石阶小庭',center:[-.08,.51,-7.45],width:3.5,height:2.55,yaw:-.68,feature:[-.38,.70,-7.16]}
 ];
 
 async function startDistrict(){
@@ -13,7 +14,7 @@ async function startDistrict(){
   // Let the cover reach the screen before outlining the thousands of small faces.
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   const mesh=createDistrictGeometry();
-  buildDistrictGround(mesh);buildDistrictBuildings(mesh);
+  buildDistrictGround(mesh);buildDistrictBuildings(mesh);buildCourtyard(mesh);
   const scene=createDistrictRenderer(canvas,mesh);
   const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
   const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -26,6 +27,7 @@ async function startDistrict(){
   let wheelStart=-Infinity,wheelBase=0,clothStart=-Infinity;
   let waterStart=-Infinity;
   let pageStart=-Infinity,pageOpen=false;
+  let birdStart=-Infinity;
   let lightStart=-Infinity,lightFrom=0,lightTo=0;
   function axes(yaw,tilt){
     const x=Math.sin(yaw),z=Math.cos(yaw),s=Math.sin(tilt),c=Math.cos(tilt);
@@ -41,7 +43,7 @@ async function startDistrict(){
     const aspect=width/Math.max(1,height),portrait=aspect<.84;
     if(id){
       const b=districtPlaces[id-1];
-      return {center:b.center.slice(),yaw:b.yaw,tilt:id===5?.46:id===4?.51:.31,
+      return {center:b.center.slice(),yaw:b.yaw,tilt:id===6?.80:id===5?.46:id===4?.51:.31,
         extent:Math.max(b.height*.61,b.width*.60/aspect)};
     }
     const yaw=portrait?-.48:.48,tilt=portrait?.67:.62,[r,u]=axes(yaw,tilt);
@@ -109,6 +111,10 @@ async function startDistrict(){
       pageStart=now;
       audio.play('paper',b.feature);
       status.textContent=pageOpen?'报纸翻开，露出夕阳下的巷尾花店插画。':'报纸翻回了头版。';
+    }else if(id===6){
+      if(now-birdStart<courtyardFlightDuration*1000)return;
+      birdStart=now;audio.play('sparrow',b.feature);
+      status.textContent='石钵泛起两圈涟漪，麻雀扑上矮墙，稍后跳回钵沿。';
     }
     request();
   }
@@ -162,7 +168,7 @@ async function startDistrict(){
   function keyAction(key){
     if(key==='m'){status.textContent=audio.toggle()?'已静音。':'声音已打开。';return;}
     if(key==='home'||key==='escape'){travel(0);return;}
-    if(['1','2','3','4','5'].includes(key)){travel(Number(key));return;}
+    if(['1','2','3','4','5','6'].includes(key)){travel(Number(key));return;}
     if((key==='enter'||key===' ')&&focus)interact(focus);
   }
   function request(){
@@ -188,7 +194,9 @@ async function startDistrict(){
     // An input can arrive after the timestamp of the first requested frame.
     const age=Math.max(0,(now-waterStart)/1000), watering=age<2.45;
     const turn=reduced.matches?1:smooth(clamp((now-pageStart)/950,0,1));
-    const animating=turn<1||watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
+    const birdElapsed=Math.max(0,(now-birdStart)/1000);
+    const birdActive=birdElapsed<courtyardFlightDuration,birdAge=birdActive?birdElapsed:-1;
+    const animating=birdActive||turn<1||watering||!!transition||now-lightStart<960||(!reduced.matches&&spinning)||cloth>0||rain>0;
     const period=now-lastTimedFrame;
     if(lastTimedFrame&&period>52&&period<3000){if(++slowFrames>=5)economyUntil=now+4500;}
     else slowFrames=0;
@@ -198,9 +206,10 @@ async function startDistrict(){
     const budget=mobile?(now<interactionUntil?3.3e6:4.6e6):5e6;
     const quality=Math.min(mobile?Math.max(1.4,native):Math.min(2.3,Math.max(1.35,native)),
       4096/Math.max(width,height),Math.sqrt(budget/area));
-    const {matrix,eye}=matrixOf(view);lastMatrix=matrix;lastEye=eye;audio.setView(matrix);
+    const bird=courtyardBirdPose(birdAge,reduced.matches);
+    const {matrix,eye}=matrixOf(view);lastMatrix=matrix;lastEye=eye;audio.setView(matrix,bird.offset);
     const angle=reduced.matches&&Number.isFinite(wheelStart)?wheelBase+wheelTravel:currentWheel(now);
-    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,
+    scene.draw({matrix,eye,focus,hover,quality,mobile,economy,active:animating,bird,birdAge,
       pageTurn:pageOpen?turn:1-turn,water:watering?(reduced.matches?.85:age):0,wheelAngle:angle,lamp:currentLight(now),clothTime:cloth>0?time:0,clothAmplitude:cloth,
       rainTime:time,rainAmount:rain});
     if(!canvas.dataset.ready){canvas.dataset.ready='true';document.querySelector('.poster')?.remove();}

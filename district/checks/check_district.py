@@ -17,10 +17,14 @@ PROBE = r"""
   const api=window.WebGL2RenderingContext?.prototype;
   if(!api)return;
   const q=window.districtCheck={history:[],last:null};
-  q.paperSounds=0;
+  q.paperSounds=0;q.sparrowSounds=0;
   const startSource=AudioBufferSourceNode.prototype.start;
   AudioBufferSourceNode.prototype.start=function(...args){
     if(this.buffer && Math.abs(this.buffer.duration-.93)<.001 && this.buffer.getChannelData(0).some(x=>Math.abs(x)>.02))q.paperSounds++;
+    if(this.buffer && Math.abs(this.buffer.duration-1.48)<.001){
+      const pcm=this.buffer.getChannelData(0),rate=this.buffer.sampleRate;
+      if(pcm.subarray(rate*.2,rate*.7).some(x=>Math.abs(x)>.02) && pcm.subarray(rate*1.12,rate*1.31).some(x=>Math.abs(x)>.02))q.sparrowSounds++;
+    }
     return startSource.apply(this,args);
   };
   const locations=new WeakMap(),programs=new WeakMap();
@@ -51,7 +55,7 @@ PROBE = r"""
     if(!state?.post||!sceneTarget)return;
     const s=programs.get(scene);
     q.last={view:s.view,scale:Math.hypot(s.view[0],s.view[4],s.view[8]),
-      pageTurn:s.pageTurn,water:s.water,lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
+      birdAge:s.birdAge,pageTurn:s.pageTurn,water:s.water,lamp:s.lamp,angle:s.angle,cloth:s.cloth,amplitude:s.clothAmplitude,
       time:performance.now(),size:[this.drawingBufferWidth,this.drawingBufferHeight]};
     q.history.push(q.last);if(q.history.length>550)q.history.shift();
   });

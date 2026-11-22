@@ -20,7 +20,7 @@ function createDistrictAudio(){
   }
   function makeSample(kind){
     if(samples.has(kind))return samples.get(kind);
-    const length={wheel:wheelDuration+.075,cloth:1.55,light:.13,water:2.12,paper:.93}[kind];
+    const length={wheel:wheelDuration+.075,cloth:1.55,light:.13,water:2.12,paper:.93,sparrow:1.48}[kind];
     const buffer=context.createBuffer(1,Math.ceil(rate*length),rate),out=buffer.getChannelData(0);
     let seed=739;
     function noise(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;}
@@ -40,6 +40,17 @@ function createDistrictAudio(){
       for(let tooth=1;tooth*toothAngle<wheelTravel;tooth++){
         const speed=Math.sqrt(1-tooth*toothAngle/wheelTravel);
         tick(wheelDuration*(1-speed),(.33+.34*speed)*(.92+.08*noise()),1380+310*speed);
+      }
+    }else if(kind==='sparrow'){
+      let low=0,mid=0,phase=0;
+      for(let i=0;i<out.length;i++){
+        const t=i/rate,n=noise();
+        low+=.055*(n-low);mid+=.46*(n-mid);
+        const flutter=Math.max(0,Math.sin((t-.14)*35))**3;
+        const air=Math.exp(-((t-.42)**2)/.055)*flutter;
+        const chirp=Math.max(0,Math.min(1,(t-1.11)/.21));
+        phase+=2*Math.PI*(2650+1150*Math.sin(Math.PI*chirp)+190*chirp)/rate;
+        out[i]=.71*air*(mid-low)+.19*Math.sin(Math.PI*chirp)**2*(Math.sin(phase)+.11*Math.sin(2*phase));
       }
     }else if(kind==='paper'){
       let low=0,mid=0;
@@ -75,7 +86,7 @@ function createDistrictAudio(){
     const dx=m[0]*x+m[4]*y+m[8]*z+m[12],dy=m[1]*x+m[5]*y+m[9]*z+m[13];
     const t=context.currentTime;
     if(voice.pan)voice.pan.pan.setTargetAtTime(Math.max(-.85,Math.min(.85,dx*.82)),t,.06);
-    const localEffect=voice.kind==='water'||voice.kind==='paper';
+    const localEffect=voice.kind==='water'||voice.kind==='paper'||voice.kind==='sparrow';
     const proximity=localEffect?Math.min(1, .22+2.4*Math.hypot(m[1],m[5],m[9])):1;
     voice.gain.gain.setTargetAtTime(.92*proximity/(1+.7*(dx*dx+dy*dy)),t,.08);
   }
@@ -92,9 +103,12 @@ function createDistrictAudio(){
     source.onended=()=>{voices.delete(v);if(spinVoice===v)spinVoice=null;source.disconnect();gain.disconnect();pan?.disconnect();};
     source.start();
   }
-  function setView(m){
+  function setView(m,sparrowPosition){
     camera=m;
-    for(const v of voices)place(v);
+    for(const v of voices){
+      if(v.kind==='sparrow')v.pos=sparrowPosition;
+      place(v);
+    }
   }
   function setVisible(next){
     if(visible===next)return;
