@@ -365,8 +365,14 @@ function buildDistrictBuildings(g) {
       b.box(x,.5,0,.12,.62,2.86,wood);
       b.box(x,1.24,0,.09,.07,2.86,frame);
     }
-    b.box(-.4,2.02,1.47,1.95,.36,.13,wood);
-    b.sign('巷尾花店',-.4,2.02,1.55,1.79,.29,'#f4e7c7','#6a8071');
+    // Hang the board beyond the glazing so the front rail stays above the lettering.
+    const signX=-.40,signY=1.84,signZ=1.93;
+    for(const x of [signX-.77,signX+.77]){
+      b.line([[x,2.18,1.67],[x,2.18,signZ],[x,2.026,signZ]],.023,'#53665a',8);
+    }
+    b.box(signX,signY,signZ,2.15,.43,.10,'#b49569');
+    b.box(signX,signY,signZ+.052,2.07,.36,.018,'#506c52');
+    b.sign('巷尾花店',signX,signY,signZ+.065,1.87,.30,'#fff1d2','#506c52');
     function flowers(x,y,z,s,color){
       pot(b,x,y,z,s,'#63825a','#b57f61');
       for(let j=0;j<5;j++){
